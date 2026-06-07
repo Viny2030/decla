@@ -8,6 +8,7 @@ Salidas:
   data/processed/ddjj_normalizada.csv
   data/processed/sujetos_obligados_clean.csv
   data/processed/altas_bajas_clean.csv
+  data/processed/tabla_judicial.csv
 """
 
 import logging
@@ -43,6 +44,14 @@ ENDPOINTS = {
     ),
 }
 
+# Nómina de magistrados federales (sin DDJJ patrimonial pública)
+MAGISTRADOS_URL = (
+    "https://datos.jus.gob.ar/dataset/3c18d46e-729e-4973-8efd-f54cab18b7e3"
+    "/resource/b12bdbb7-646f-4701-99b7-1109ce919dd5"
+    "/download/magistrados-justicia-federal-nacional-jueces-20260605.csv"
+)
+MAGISTRADOS_CONSULTA = "https://consejomagistratura.gov.ar/index.php/declaraciones-juradas-patrimoniales/"
+
 BCRA_API = "https://api.bcra.gob.ar/estadisticas/v2.0/datosvariable/4/2023-01-01/2024-12-31"
 TC_FIJO  = 900.0
 
@@ -67,6 +76,24 @@ def descargar_fuentes() -> dict[str, pd.DataFrame]:
             log.warning(f"  ✗ {nombre}: {e}")
             dfs[nombre] = pd.DataFrame()
     return dfs
+
+
+def descargar_magistrados() -> pd.DataFrame:
+    dest = RAW_DIR / "magistrados_federales.csv"
+    if dest.exists():
+        log.info(f"magistrados: caché local ({dest.stat().st_size // 1024} KB)")
+        return pd.read_csv(dest, low_memory=False)
+    try:
+        log.info("Descargando nómina magistrados federales...")
+        r = requests.get(MAGISTRADOS_URL, headers={"User-Agent": "monitor-ddjj/1.0"}, timeout=60)
+        r.raise_for_status()
+        dest.write_bytes(r.content)
+        df = pd.read_csv(dest, low_memory=False)
+        log.info(f"  ✓ {len(df)} magistrados")
+        return df
+    except Exception as e:
+        log.warning(f"  ✗ magistrados: {e}")
+        return pd.DataFrame()
 
 
 def obtener_tipo_cambio() -> float:
@@ -161,6 +188,30 @@ def extraer_altas_bajas(ddjj: pd.DataFrame) -> pd.DataFrame:
     return ddjj[cols].dropna(how="all").drop_duplicates().reset_index(drop=True)
 
 
+def construir_tabla_judicial(magistrados: pd.DataFrame) -> pd.DataFrame:
+    if magistrados.empty:
+        return pd.DataFrame()
+    df = magistrados.copy()
+    df.columns = df.columns.str.lower().str.strip()
+    tabla = pd.DataFrame({
+        "fuente":            "PODER_JUDICIAL",
+        "nombre":            df.get("magistrado_nombre", pd.Series(dtype=str)),
+        "dni":               df.get("magistrado_dni",    pd.Series(dtype=str)),
+        "genero":            df.get("magistrado_genero", pd.Series(dtype=str)),
+        "cargo":             df.get("cargo_tipo",        pd.Series(dtype=str)),
+        "organismo":         df.get("organo_nombre",     pd.Series(dtype=str)),
+        "camara":            df.get("camara",            pd.Series(dtype=str)),
+        "provincia":         df.get("organo_provincia",  pd.Series(dtype=str)),
+        "fecha_jura":        df.get("cargo_fecha_jura",  pd.Series(dtype=str)),
+        "cobertura":         df.get("cargo_cobertura",   pd.Series(dtype=str)),
+        "ddjj_estado":       "NO_DISPONIBLE_PUBLICAMENTE",
+        "ddjj_consulta_url": MAGISTRADOS_CONSULTA,
+    })
+    tabla = tabla[tabla["nombre"].notna() & (tabla["nombre"].astype(str).str.strip() != "")]
+    log.info(f"  ✓ tabla_judicial.csv — {len(tabla)} magistrados")
+    return tabla
+
+
 def run_etl() -> pd.DataFrame:
     log.info("=" * 55)
     log.info("FASE 1 — ETL")
@@ -197,6 +248,12 @@ def run_etl() -> pd.DataFrame:
     if not deudas.empty:
         deudas.to_csv(PROC_DIR / "ddjj_deudas.csv", index=False)
         log.info(f"  ✓ ddjj_deudas.csv — {len(deudas)} registros")
+
+    # Nómina judicial
+    magistrados = descargar_magistrados()
+    tabla_judicial = construir_tabla_judicial(magistrados)
+    if not tabla_judicial.empty:
+        tabla_judicial.to_csv(PROC_DIR / "tabla_judicial.csv", index=False)
 
     log.info(f"Fase 1 OK — DDJJ normalizadas: {len(ddjj)}")
     return ddjj
