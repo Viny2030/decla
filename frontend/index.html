@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor DDJJ — Argentina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f5f0e8;
+    --surface:   #faf7f2;
+    --surface2:  #ede8de;
+    --border:    #d4cec0;
+    --border2:   #c4bfb0;
+    --text:      #2a2820;
+    --muted:     #7a7468;
+    --accent:    #2d5a27;
+    --accent2:   #4a8c42;
+    --danger:    #8b2020;
+    --warn:      #8b5e00;
+    --ok:        #1a5c2a;
+    --mid:       #3d3580;
+    --ink:       #1a1a16;
+    --mono:      'IBM Plex Mono', monospace;
+    --display:   'Playfair Display', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 20% 80%, rgba(45,90,39,0.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(61,53,128,0.03) 0%, transparent 50%);
+  }
+
+  header {
+    border-bottom: 2px solid var(--ink);
+    padding: 0 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .logo-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 6px;
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  #clock { font-weight: 500; color: var(--text); }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 36px;
+    background: var(--surface);
+    overflow-x: auto;
+  }
+
+  .tab {
+    padding: 13px 18px;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+  .content { display: none; padding: 28px 36px; max-width: 1400px; }
+  .content.active { display: block; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    padding: 20px 22px;
+    position: relative;
+  }
+
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .kpi.danger::before { background: var(--danger); }
+  .kpi.warn::before   { background: var(--warn); }
+  .kpi.ok::before     { background: var(--ok); }
+  .kpi.mid::before    { background: var(--mid); }
+  .kpi.accent::before { background: var(--accent); }
+
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .kpi-value {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .table-wrap {
+    border: 1px solid var(--border);
+    overflow: auto;
+    max-height: 540px;
+    background: var(--surface);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  thead th {
+    background: var(--surface2);
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky; top: 0;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  thead th:hover { color: var(--text); }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: var(--surface2); }
+
+  td {
+    padding: 10px 14px;
+    color: var(--text);
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+
+  .badge-CRÍTICO, .badge-CRITICO {
+    background: #f8e8e8; color: var(--danger);
+    border-color: rgba(139,32,32,0.3);
+  }
+  .badge-ALTO {
+    background: #fdf3e0; color: var(--warn);
+    border-color: rgba(139,94,0,0.3);
+  }
+  .badge-MEDIO {
+    background: #eeedf8; color: var(--mid);
+    border-color: rgba(61,53,128,0.3);
+  }
+  .badge-BAJO {
+    background: #e8f2e9; color: var(--ok);
+    border-color: rgba(26,92,42,0.3);
+  }
+
+  .score-bar { display: flex; align-items: center; gap: 8px; }
+  .bar-bg { flex: 1; height: 3px; background: var(--border); border-radius: 2px; min-width: 60px; }
+  .bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s; }
+  .bar-fill.danger { background: var(--danger); }
+  .bar-fill.warn   { background: var(--warn); }
+  .bar-fill.mid    { background: var(--mid); }
+  .bar-fill.ok     { background: var(--ok); }
+
+  .filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-input, .filter-select {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .filter-input:focus, .filter-select:focus { border-color: var(--accent); }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  .btn:hover, .btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .btn-accent { border-color: var(--accent); color: var(--accent); }
+  .btn-accent:hover { background: var(--accent); color: #fff; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+  @media(max-width:900px){ .two-col { grid-template-columns: 1fr; } }
+
+  .card {
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+    background: var(--surface);
+  }
+
+  .card-title {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+    font-weight: 500;
+  }
+
+  .dist-grid {
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .dist-item { background: var(--surface); padding: 16px; text-align: center; }
+  .dist-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .dist-count { font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--ink); }
+  .dist-pct   { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  .judicial-note {
+    border-left: 3px solid var(--warn);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    background: #fdf8ed;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .judicial-note-text { font-size: 12px; color: var(--text); line-height: 1.7; }
+  .judicial-note-text a { color: var(--accent); text-decoration: underline; }
+  .judicial-note-text strong { color: var(--ink); }
+
+  .anom-grid {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .anom-item { background: var(--surface); padding: 18px 22px; }
+  .anom-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; }
+  .anom-val { font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--ink); }
+
+  .pagination {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #e8f2e9;
+    color: var(--ok);
+    font-size: 9px;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+    border: 1px solid rgba(26,92,42,0.2);
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  .tag-leg { background: #eeedf8; color: var(--mid); border-color: rgba(61,53,128,0.2); }
+
+  .loading { text-align:center; padding:36px; color:var(--muted); font-size:12px; letter-spacing:0.1em; }
+  .error-msg { padding:14px 18px; border:1px solid rgba(139,32,32,0.3); color:var(--danger); font-size:12px; background:#f8e8e8; }
+
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .divider { border:none; border-top:1px solid var(--border); margin:24px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    Monitor DDJJ
+    <span class="logo-sub">/ Argentina</span>
+  </div>
+  <div class="header-right">
+    <span><span class="live-dot"></span>datos.jus.gob.ar · 2024</span>
+    <span id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('resumen',this)">Resumen</div>
+  <div class="tab" onclick="switchTab('scoring',this)">Scoring</div>
+  <div class="tab" onclick="switchTab('alertas',this)">Alertas</div>
+  <div class="tab" onclick="switchTab('judicial',this)">Poder Judicial</div>
+  <div class="tab" onclick="switchTab('anomalias',this)">Anomalías ML</div>
+</div>
+
+<!-- RESUMEN -->
+<div id="tab-resumen" class="content active">
+  <div id="kpi-grid" class="kpi-grid"><div class="loading">Cargando datos</div></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Distribución de riesgo — Fase 3</div>
+      <div id="dist-f3"><div class="loading">Cargando</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cobertura por poder del Estado</div>
+      <div id="cobertura-poderes" style="padding:4px 0"></div>
+    </div>
+  </div>
+  <div class="section-title">Top 10 funcionarios — mayor score de riesgo</div>
+  <div class="table-wrap">
+    <table id="top10-table">
+      <thead><tr>
+        <th>Funcionario</th><th>Organismo</th><th>Cargo</th>
+        <th>IVPI</th><th>Score</th><th>Nivel</th>
+      </tr></thead>
+      <tbody><tr><td colspan="6" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SCORING -->
+<div id="tab-scoring" class="content">
+  <div class="filters">
+    <input class="filter-input" id="sc-search" placeholder="Buscar nombre u organismo..."
+           style="width:260px" oninput="filterScoring()">
+    <select class="filter-select" id="sc-nivel" onchange="filterScoring()">
+      <option value="">Todos los niveles</option>
+      <option>CRÍTICO</option><option>ALTO</option><option>MEDIO</option><option>BAJO</option>
+    </select>
+    <select class="filter-select" id="sc-poder" onchange="filterScoring()">
+      <option value="">Todos los poderes</option>
+      <option value="EJECUTIVO">Ejecutivo</option>
+      <option value="LEGISLATIVO">Legislativo</option>
+      <option value="JUDICIAL">Judicial</option>
+    </select>
+    <span id="sc-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="scoring-table">
+      <thead><tr>
+        <th>Funcionario</th><th>Organismo</th><th>Cargo</th><th>Año</th>
+        <th>PN Inicial</th><th>PN Final</th>
+        <th onclick="sortSc(6)">IVPI ↕</th>
+        <th onclick="sortSc(7)">Score ↕</th>
+        <th>Nivel</th>
+      </tr></thead>
+      <tbody><tr><td colspan="9" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button class="btn" onclick="scoringPage(-1)">← Anterior</button>
+    <span id="sc-page-info"></span>
+    <button class="btn" onclick="scoringPage(1)">Siguiente →</button>
+  </div>
+</div>
+
+<!-- ALERTAS -->
+<div id="tab-alertas" class="content">
+  <div class="filters">
+    <button class="btn active" id="btn-puertas" onclick="loadAlertas('PUERTAS',this)">Puertas giratorias</button>
+    <button class="btn" id="btn-conflicto" onclick="loadAlertas('CONFLICTO',this)">Conflicto de interés</button>
+    <input class="filter-input" id="al-search" placeholder="Buscar..."
+           style="width:220px;margin-left:auto" oninput="filterAlertas()">
+  </div>
+  <div id="alertas-count" style="color:var(--muted);font-size:11px;margin-bottom:14px"></div>
+  <div class="table-wrap">
+    <table id="alertas-table">
+      <thead><tr id="alertas-header"></tr></thead>
+      <tbody><tr><td colspan="6" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button class="btn" onclick="alertasPage(-1)">← Anterior</button>
+    <span id="al-page-info"></span>
+    <button class="btn" onclick="alertasPage(1)">Siguiente →</button>
+  </div>
+</div>
+
+<!-- JUDICIAL -->
+<div id="tab-judicial" class="content">
+  <div class="judicial-note">
+    <div style="font-size:18px;margin-top:2px">⚖</div>
+    <div class="judicial-note-text">
+      Los magistrados presentan su DDJJ ante el <strong>Consejo de la Magistratura</strong>.
+      El Anexo Patrimonial es <strong>reservado</strong> — no disponible en bulk.
+      Consulta individual en:
+      <a href="https://consejomagistratura.gov.ar/index.php/declaraciones-juradas-patrimoniales/" target="_blank">
+        consejomagistratura.gov.ar →
+      </a>
+    </div>
+  </div>
+  <div class="filters">
+    <input class="filter-input" id="jud-search" placeholder="Buscar magistrado u órgano..."
+           style="width:270px" oninput="filterJudicial()">
+    <select class="filter-select" id="jud-tipo" onchange="filterJudicial()">
+      <option value="">Todos los cargos</option>
+      <option>Juez</option><option>Fiscal</option><option>Defensor</option>
+    </select>
+    <select class="filter-select" id="jud-prov" onchange="filterJudicial()">
+      <option value="">Todas las provincias</option>
+    </select>
+    <span id="jud-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="judicial-table">
+      <thead><tr>
+        <th>Magistrado</th><th>Cargo</th><th>Órgano</th>
+        <th>Cámara</th><th>Provincia</th><th>Fecha jura</th><th>DDJJ</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button class="btn" onclick="judicialPage(-1)">← Anterior</button>
+    <span id="jud-page-info"></span>
+    <button class="btn" onclick="judicialPage(1)">Siguiente →</button>
+  </div>
+</div>
+
+<!-- ANOMALÍAS -->
+<div id="tab-anomalias" class="content">
+  <div id="anom-kpis" class="anom-grid">
+    <div class="loading" style="grid-column:1/-1">Cargando</div>
+  </div>
+  <div class="section-title">Anomalías por consenso IF ∩ SVM</div>
+  <div class="table-wrap">
+    <table id="anomalias-table">
+      <thead><tr>
+        <th>Funcionario</th><th>Organismo</th>
+        <th>Score riesgo</th><th>IF score</th>
+        <th>IVPI</th><th>PN final</th><th>Nivel</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const PAGE = 50;
+let scData=[], scFiltered=[], scPage=0, scSortCol=-1, scSortAsc=false;
+let alData=[], alFiltered=[], alPage=0;
+let judData=[], judFiltered=[], judPage=0;
+
+function updateClock(){
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('es-AR',{hour12:false});
+}
+setInterval(updateClock,1000); updateClock();
+
+function switchTab(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function api(url){
+  try{const r=await fetch(url); if(!r.ok) throw new Error(r.status); return await r.json();}
+  catch{return null;}
+}
+
+function fmt(n,d=0){
+  if(n==null||isNaN(n)) return '—';
+  return Number(n).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+}
+
+function badge(nivel){
+  const k=(nivel||'').replace('Í','I').replace('É','E');
+  return `<span class="badge badge-${k}">${nivel||'—'}</span>`;
+}
+
+function bar(val,max=100){
+  const p=Math.min(100,Math.max(0,(val/max)*100));
+  const cls=p>=70?'danger':p>=45?'warn':p>=20?'mid':'ok';
+  return `<div class="score-bar"><div class="bar-bg"><div class="bar-fill ${cls}" style="width:${p}%"></div></div>
+  <span style="min-width:28px;text-align:right;color:var(--text)">${fmt(val)}</span></div>`;
+}
+
+function poderTag(org){
+  if(!org) return '';
+  const u=org.toUpperCase();
+  if(u.includes('SENADO')||u.includes('DIPUTADOS')||u.includes('LEGISLAT'))
+    return '<span class="tag tag-leg">LEG</span>';
+  if(u.includes('JUDICIAL')||u.includes('TRIBUNAL')||u.includes('MAGISTRATURA'))
+    return '<span class="tag">JUD</span>';
+  return '';
+}
+
+async function loadResumen(){
+  const d=await api('/api/resumen');
+  if(!d){
+    document.getElementById('kpi-grid').innerHTML='<div class="error-msg">Error al cargar. ¿Está corriendo la API?</div>';
+    return;
+  }
+  const dist=d.distribucion_riesgo_f3||{};
+  const total=d.total_funcionarios||0;
+
+  document.getElementById('kpi-grid').innerHTML=`
+    <div class="kpi danger">
+      <div class="kpi-label">Anomalías ML</div>
+      <div class="kpi-value">${fmt(d.anomalias_ml)}</div>
+      <div class="kpi-sub">Consenso IF ∩ SVM</div>
+    </div>
+    <div class="kpi warn">
+      <div class="kpi-label">Riesgo alto</div>
+      <div class="kpi-value">${fmt(dist['ALTO']||0)}</div>
+      <div class="kpi-sub">IVPI &gt; 1.5×</div>
+    </div>
+    <div class="kpi mid">
+      <div class="kpi-label">Riesgo medio</div>
+      <div class="kpi-value">${fmt(dist['MEDIO']||0)}</div>
+      <div class="kpi-sub">IVPI 1.0–1.5×</div>
+    </div>
+    <div class="kpi accent">
+      <div class="kpi-label">Total funcionarios</div>
+      <div class="kpi-value">${fmt(total)}</div>
+      <div class="kpi-sub">DDJJ 2024 normalizadas</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Alertas puertas</div>
+      <div class="kpi-value">${fmt(d.alertas_puertas)}</div>
+      <div class="kpi-sub">Rotación público/privado</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Alertas conflicto</div>
+      <div class="kpi-value">${fmt(d.alertas_conflicto)||'0'}</div>
+      <div class="kpi-sub">Contrataciones cruzadas</div>
+    </div>`;
+
+  const colors={'CRÍTICO':['#f8e8e8','var(--danger)'],'ALTO':['#fdf3e0','var(--warn)'],'MEDIO':['#eeedf8','var(--mid)'],'BAJO':['#e8f2e9','var(--ok)']};
+  document.getElementById('dist-f3').innerHTML='<div class="dist-grid">'+
+    ['CRÍTICO','ALTO','MEDIO','BAJO'].map(k=>{
+      const v=dist[k]||0;
+      const pct=total?((v/total)*100).toFixed(1):0;
+      return `<div class="dist-item">
+        <div class="dist-label" style="color:${colors[k][1]}">${k}</div>
+        <div class="dist-count">${fmt(v)}</div>
+        <div class="dist-pct">${pct}%</div>
+      </div>`;
+    }).join('')+'</div>';
+
+  document.getElementById('cobertura-poderes').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      ${[
+        {l:'Poder Ejecutivo',v:65000,t:total,c:'var(--accent)'},
+        {l:'Poder Legislativo',v:452,t:total,c:'var(--mid)'},
+        {l:'Judicial (administrativo)',v:258,t:total,c:'var(--warn)'},
+        {l:'Magistrados (sin DDJJ pública)',v:895,t:895,c:'var(--muted)'},
+      ].map(p=>{
+        const pct=p.l.includes('Magistr')?100:Math.min(100,(p.v/p.t)*100);
+        return `<div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <span style="font-size:11px;color:var(--text)">${p.l}</span>
+            <span style="font-size:11px;color:var(--muted)">${fmt(p.v)}</span>
+          </div>
+          <div class="bar-bg" style="height:5px">
+            <div style="height:100%;width:${pct}%;background:${p.c};border-radius:2px;transition:width 1s"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  loadTop10();
+}
+
+async function loadTop10(){
+  const d=await api('/api/scoring?limite=10');
+  if(!d||!d.datos) return;
+  document.querySelector('#top10-table tbody').innerHTML=d.datos.map(r=>`<tr>
+    <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,30)}${poderTag(r.organismo)}</td>
+    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
+    <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,22)}</td>
+    <td style="color:${r.ivpi>3?'var(--danger)':r.ivpi>1.5?'var(--warn)':'var(--text)'}">${fmt(r.ivpi,2)}</td>
+    <td>${bar(r.score_riesgo)}</td>
+    <td>${badge(r.nivel_riesgo)}</td>
+  </tr>`).join('');
+}
+
+async function loadScoring(){
+  const d=await api('/api/scoring?limite=500');
+  if(!d||!d.datos) return;
+  scData=d.datos; filterScoring();
+}
+
+function filterScoring(){
+  const q=(document.getElementById('sc-search').value||'').toLowerCase();
+  const niv=document.getElementById('sc-nivel').value;
+  const pod=document.getElementById('sc-poder').value;
+  scFiltered=scData.filter(r=>{
+    const org=(r.organismo||'').toUpperCase();
+    const mQ=!q||(r.funcionario_apellido_nombre||'').toLowerCase().includes(q)||(r.organismo||'').toLowerCase().includes(q);
+    const mN=!niv||r.nivel_riesgo===niv;
+    let mP=true;
+    if(pod==='EJECUTIVO')   mP=!org.includes('SENADO')&&!org.includes('DIPUTADOS')&&!org.includes('JUDICIAL');
+    if(pod==='LEGISLATIVO') mP=org.includes('SENADO')||org.includes('DIPUTADOS')||org.includes('LEGISLAT');
+    if(pod==='JUDICIAL')    mP=org.includes('JUDICIAL')||org.includes('TRIBUNAL')||org.includes('MAGISTRATURA');
+    return mQ&&mN&&mP;
+  });
+  scPage=0; renderScoring();
+}
+
+function sortSc(col){
+  if(scSortCol===col) scSortAsc=!scSortAsc;
+  else { scSortCol=col; scSortAsc=false; }
+  scFiltered.sort((a,b)=>{
+    const keys=['funcionario_apellido_nombre','organismo','cargo','anio','total_bienes_inicio','total_bienes_final','ivpi','score_riesgo'];
+    const k=keys[col];
+    const av=a[k]; const bv=b[k];
+    if(typeof av==='number') return scSortAsc?av-bv:bv-av;
+    return scSortAsc?(av||'').localeCompare(bv||''):(bv||'').localeCompare(av||'');
+  });
+  renderScoring();
+}
+
+function renderScoring(){
+  const start=scPage*PAGE;
+  const page=scFiltered.slice(start,start+PAGE);
+  document.getElementById('sc-count').textContent=`${scFiltered.length.toLocaleString()} resultados`;
+  document.getElementById('sc-page-info').textContent=`Pág ${scPage+1} / ${Math.max(1,Math.ceil(scFiltered.length/PAGE))}`;
+  document.querySelector('#scoring-table tbody').innerHTML=page.map(r=>`<tr>
+    <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,30)}${poderTag(r.organismo)}</td>
+    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
+    <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,22)}</td>
+    <td>${r.anio||'—'}</td>
+    <td>${fmt(r.total_bienes_inicio)}</td>
+    <td>${fmt(r.total_bienes_final)}</td>
+    <td style="color:${r.ivpi>3?'var(--danger)':r.ivpi>1.5?'var(--warn)':'var(--text)'}">${fmt(r.ivpi,2)}</td>
+    <td>${bar(r.score_riesgo)}</td>
+    <td>${badge(r.nivel_riesgo)}</td>
+  </tr>`).join('')||'<tr><td colspan="9" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
+}
+
+function scoringPage(d){ scPage=Math.max(0,Math.min(Math.ceil(scFiltered.length/PAGE)-1,scPage+d)); renderScoring(); }
+
+async function loadAlertas(tipo,btn){
+  document.querySelectorAll('#tab-alertas .btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const d=await api('/api/alertas?tipo='+tipo);
+  if(!d||!d.datos){
+    document.querySelector('#alertas-table tbody').innerHTML=`<tr><td colspan="6" class="error-msg">Sin datos para ${tipo}</td></tr>`;
+    return;
+  }
+  alData=d.datos;
+  document.getElementById('alertas-count').textContent=`${d.total.toLocaleString()} alertas`;
+  const cols=alData.length?Object.keys(alData[0]).slice(0,7):[];
+  document.getElementById('alertas-header').innerHTML=cols.map(c=>`<th>${c}</th>`).join('');
+  filterAlertas();
+}
+
+function filterAlertas(){
+  const q=(document.getElementById('al-search').value||'').toLowerCase();
+  alFiltered=q?alData.filter(r=>JSON.stringify(r).toLowerCase().includes(q)):[...alData];
+  alPage=0; renderAlertas();
+}
+
+function renderAlertas(){
+  const start=alPage*PAGE;
+  const page=alFiltered.slice(start,start+PAGE);
+  const cols=alData.length?Object.keys(alData[0]).slice(0,7):[];
+  document.getElementById('al-page-info').textContent=`Pág ${alPage+1} / ${Math.max(1,Math.ceil(alFiltered.length/PAGE))}`;
+  document.querySelector('#alertas-table tbody').innerHTML=page.map(r=>`<tr>${cols.map(c=>`<td title="${r[c]||''}">${String(r[c]||'—').substring(0,34)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
+}
+
+function alertasPage(d){ alPage=Math.max(0,Math.min(Math.ceil(alFiltered.length/PAGE)-1,alPage+d)); renderAlertas(); }
+
+async function loadJudicial(){
+  const d=await api('/api/judicial');
+  if(!d||!d.datos) return;
+  judData=d.datos;
+  const provs=[...new Set(judData.map(r=>r.provincia).filter(Boolean))].sort();
+  const sel=document.getElementById('jud-prov');
+  provs.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
+  filterJudicial();
+}
+
+function filterJudicial(){
+  const q=(document.getElementById('jud-search').value||'').toLowerCase();
+  const tipo=document.getElementById('jud-tipo').value;
+  const prov=document.getElementById('jud-prov').value;
+  judFiltered=judData.filter(r=>{
+    const mQ=!q||(r.nombre||'').toLowerCase().includes(q)||(r.organismo||'').toLowerCase().includes(q);
+    const mT=!tipo||(r.cargo||'').includes(tipo);
+    const mP=!prov||r.provincia===prov;
+    return mQ&&mT&&mP;
+  });
+  judPage=0; renderJudicial();
+}
+
+function renderJudicial(){
+  const start=judPage*PAGE;
+  const page=judFiltered.slice(start,start+PAGE);
+  document.getElementById('jud-count').textContent=`${judFiltered.length.toLocaleString()} magistrados`;
+  document.getElementById('jud-page-info').textContent=`Pág ${judPage+1} / ${Math.max(1,Math.ceil(judFiltered.length/PAGE))}`;
+  document.querySelector('#judicial-table tbody').innerHTML=page.map(r=>`<tr>
+    <td>${(r.nombre||'—').substring(0,30)}</td>
+    <td>${r.cargo||'—'}</td>
+    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
+    <td title="${r.camara||''}">${(r.camara||'—').substring(0,22)}</td>
+    <td>${r.provincia||'—'}</td>
+    <td>${r.fecha_jura||'—'}</td>
+    <td><a href="${r.ddjj_consulta_url}" target="_blank" style="color:var(--accent);font-size:11px">Consultar →</a></td>
+  </tr>`).join('')||'<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
+}
+
+function judicialPage(d){ judPage=Math.max(0,Math.min(Math.ceil(judFiltered.length/PAGE)-1,judPage+d)); renderJudicial(); }
+
+async function loadAnomalias(){
+  const d=await api('/api/anomalias');
+  document.getElementById('anom-kpis').innerHTML=`
+    <div class="anom-item">
+      <div class="anom-label">Total anomalías</div>
+      <div class="anom-val" style="color:var(--danger)">${d?fmt(d.total):'—'}</div>
+    </div>
+    <div class="anom-item">
+      <div class="anom-label">Isolation Forest</div>
+      <div class="anom-val" style="color:var(--warn)">3.319</div>
+    </div>
+    <div class="anom-item">
+      <div class="anom-label">One-Class SVM</div>
+      <div class="anom-val" style="color:var(--mid)">2.403</div>
+    </div>`;
+  if(!d||!d.datos||!d.datos.length){
+    document.querySelector('#anomalias-table tbody').innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin anomalías por consenso.</td></tr>';
+    return;
+  }
+  document.querySelector('#anomalias-table tbody').innerHTML=d.datos.slice(0,100).map(r=>`<tr>
+    <td>${(r.funcionario_apellido_nombre||r.nombre||'—').substring(0,28)}</td>
+    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,24)}</td>
+    <td>${bar(r.score_riesgo)}</td>
+    <td style="color:var(--danger)">${fmt(r.if_score,3)}</td>
+    <td>${fmt(r.ivpi,2)}</td>
+    <td>${fmt(r.pn_actual)}</td>
+    <td>${badge(r.nivel_riesgo)}</td>
+  </tr>`).join('');
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  loadResumen();
+  loadScoring();
+  loadAlertas('PUERTAS',document.getElementById('btn-puertas'));
+  loadJudicial();
+  loadAnomalias();
+});
+</script>
+</body>
+</html>
