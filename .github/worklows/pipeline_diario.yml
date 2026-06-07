@@ -1,0 +1,64 @@
+name: Monitor DDJJ — Pipeline Diario
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC / 03:00 Argentina
+  workflow_dispatch:
+    inputs:
+      fases:
+        description: 'Fases a ejecutar (ej: 1 2 3 4)'
+        required: false
+        default: '1 2 3 4'
+
+permissions:
+  contents: write
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Crear directorios
+        run: mkdir -p data/raw data/processed models
+
+      - name: Fase 1 — ETL
+        run: python pipeline.py --fase 1 --sin-indicadores
+
+      - name: Fase 2 — Cruces
+        run: python pipeline.py --fase 2 --sin-indicadores
+
+      - name: Fase 3 — Scoring
+        run: python pipeline.py --fase 3 --sin-indicadores
+
+      - name: Fase 4 — ML
+        run: python pipeline.py --fase 4 --sin-indicadores
+
+      - name: Indicadores Internacionales
+        run: python pipeline.py --fase 5
+
+      - name: Commit resultados
+        run: |
+          git config --global user.name  'Robot Monitor DDJJ'
+          git config --global user.email 'robot-ddjj@noreply.github.com'
+          git pull --rebase origin main
+          git add data/processed/ || true
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Monitor DDJJ $(date +'%Y-%m-%d') — pipeline completo"
+            git push origin main
+          else
+            echo "Sin cambios."
+          fi

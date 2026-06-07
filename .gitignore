@@ -1,0 +1,18 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# PyCharm
+.idea/
+
+# Datos — no subir CSVs pesados al repo
+data/raw/
+data/processed/
+
+# Variables de entorno
+.env
+
+# Tipo de cambio cache
+data/raw/tipo_cambio.csv
