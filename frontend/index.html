@@ -4,853 +4,881 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monitor DDJJ — Argentina</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  :root {
-    --bg:        #f5f0e8;
-    --surface:   #faf7f2;
-    --surface2:  #ede8de;
-    --border:    #d4cec0;
-    --border2:   #c4bfb0;
-    --text:      #2a2820;
-    --muted:     #7a7468;
-    --accent:    #2d5a27;
-    --accent2:   #4a8c42;
-    --danger:    #8b2020;
-    --warn:      #8b5e00;
-    --ok:        #1a5c2a;
-    --mid:       #3d3580;
-    --ink:       #1a1a16;
-    --mono:      'IBM Plex Mono', monospace;
-    --display:   'Playfair Display', Georgia, serif;
-  }
+:root{
+  --bg:#0d1b2a;--surface:#112236;--surface2:#162c44;--border:#1e3a56;--border2:#2a4f72;
+  --text:#c8dff0;--muted:#4a7a9b;--accent:#00c4ff;--green:#00e676;--teal:#00bcd4;
+  --danger:#ff4444;--warn:#ffaa00;--mid:#7c4dff;--ink:#e8f4fd;
+  --sans:'Syne',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;min-height:100vh}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+header{border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:200;background:rgba(13,27,42,0.97);backdrop-filter:blur(10px)}
+.logo{font-family:var(--sans);font-weight:800;font-size:20px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.logo-accent{color:var(--accent)}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.header-right{display:flex;align-items:center;gap:20px;font-size:11px;color:var(--muted)}
+#clock{color:var(--accent);font-weight:500}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    min-height: 100vh;
-    background-image:
-      radial-gradient(circle at 20% 80%, rgba(45,90,39,0.04) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(61,53,128,0.03) 0%, transparent 50%);
-  }
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 32px;background:var(--surface);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:13px 16px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-  header {
-    border-bottom: 2px solid var(--ink);
-    padding: 0 36px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 64px;
-    background: var(--surface);
-    position: sticky; top: 0; z-index: 100;
-  }
+.content{display:none;padding:28px 32px;max-width:1500px}
+.content.active{display:block}
 
-  .logo {
-    font-family: var(--display);
-    font-weight: 900;
-    font-size: 22px;
-    letter-spacing: -0.5px;
-    color: var(--ink);
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:28px}
+.kpi{background:var(--surface);padding:20px;position:relative}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.kpi.blue::after{background:var(--accent)}.kpi.green::after{background:var(--green)}
+.kpi.teal::after{background:var(--teal)}.kpi.warn::after{background:var(--warn)}
+.kpi.danger::after{background:var(--danger)}.kpi.mid::after{background:var(--mid)}
+.kpi-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.kpi-value{font-family:var(--sans);font-weight:800;font-size:32px;line-height:1;color:var(--ink)}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5}
 
-  .logo-sub {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 400;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
+.section-title{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    font-size: 11px;
-    color: var(--muted);
-  }
+.table-wrap{border:1px solid var(--border);overflow:auto;max-height:540px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--surface2);padding:9px 13px;text-align:left;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;cursor:pointer}
+thead th:hover{color:var(--text)}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;cursor:pointer}
+tbody tr:hover{background:var(--surface2)}
+td{padding:9px 13px;color:var(--text);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
 
-  .live-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-    margin-right: 6px;
-    animation: blink 2s ease-in-out infinite;
-  }
+.badge{display:inline-block;padding:2px 7px;border-radius:2px;font-size:10px;letter-spacing:0.06em;font-weight:600;text-transform:uppercase;border:1px solid}
+.badge-CRÍTICO,.badge-CRITICO{background:rgba(255,68,68,.12);color:var(--danger);border-color:rgba(255,68,68,.3)}
+.badge-ALTO{background:rgba(255,170,0,.12);color:var(--warn);border-color:rgba(255,170,0,.3)}
+.badge-MEDIO{background:rgba(124,77,255,.12);color:var(--mid);border-color:rgba(124,77,255,.3)}
+.badge-BAJO{background:rgba(0,230,118,.08);color:var(--green);border-color:rgba(0,230,118,.2)}
 
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.score-bar{display:flex;align-items:center;gap:8px}
+.bar-bg{flex:1;height:3px;background:var(--border2);border-radius:2px;min-width:55px}
+.bar-fill{height:100%;border-radius:2px;transition:width .4s}
+.bar-fill.danger{background:var(--danger)}.bar-fill.warn{background:var(--warn)}
+.bar-fill.mid{background:var(--mid)}.bar-fill.ok{background:var(--green)}
+.bar-fill.blue{background:var(--accent)}.bar-fill.teal{background:var(--teal)}
 
-  #clock { font-weight: 500; color: var(--text); }
+.filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-input,.filter-select{background:var(--surface);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 11px;outline:none;transition:border-color .15s}
+.filter-input:focus,.filter-select:focus{border-color:var(--accent)}
+.btn{background:transparent;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:7px 14px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .15s}
+.btn:hover,.btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 
-  .tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    padding: 0 36px;
-    background: var(--surface);
-    overflow-x: auto;
-  }
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:1000px){.three-col{grid-template-columns:1fr 1fr}}
+.card{border:1px solid var(--border);padding:20px;background:var(--surface)}
+.card-title{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
 
-  .tab {
-    padding: 13px 18px;
-    cursor: pointer;
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
+.dist-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+.dist-item{background:var(--surface);padding:14px;text-align:center}
+.dist-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.dist-count{font-family:var(--sans);font-weight:800;font-size:26px;color:var(--ink)}
+.dist-pct{font-size:10px;color:var(--muted);margin-top:3px}
 
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.pagination{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px;font-size:11px;color:var(--muted)}
+.tag{display:inline-block;padding:1px 5px;background:rgba(0,196,255,.1);color:var(--accent);font-size:9px;border-radius:2px;border:1px solid rgba(0,196,255,.2);margin-left:4px}
+.tag-leg{background:rgba(124,77,255,.1);color:var(--mid);border-color:rgba(124,77,255,.2)}
+.tag-jud{background:rgba(0,188,212,.1);color:var(--teal);border-color:rgba(0,188,212,.2)}
 
-  .content { display: none; padding: 28px 36px; max-width: 1400px; }
-  .content.active { display: block; }
+.loading{text-align:center;padding:36px;color:var(--muted);font-size:12px;letter-spacing:.1em}
+.error-msg{padding:14px 18px;border:1px solid rgba(255,68,68,.3);color:var(--danger);font-size:12px;background:rgba(255,68,68,.05)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    margin-bottom: 28px;
-  }
+.judicial-note{border-left:3px solid var(--warn);padding:14px 18px;margin-bottom:20px;background:rgba(255,170,0,.05);display:flex;gap:14px}
+.judicial-note-text{font-size:12px;color:var(--text);line-height:1.7}
+.judicial-note-text a{color:var(--accent)}
 
-  .kpi {
-    background: var(--surface);
-    padding: 20px 22px;
-    position: relative;
-  }
+.marcos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:24px}
+.marco-item{background:var(--surface);padding:18px}
+.marco-name{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px}
+.marco-score{font-family:var(--sans);font-weight:800;font-size:28px;color:var(--ink)}
+.marco-desc{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5}
+.marco-bar{height:3px;background:var(--border2);border-radius:2px;margin-top:10px}
+.marco-bar-fill{height:100%;border-radius:2px}
 
-  .kpi::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-  }
+.indic-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.indic-row:last-child{border-bottom:none}
+.indic-code{font-size:10px;color:var(--accent);min-width:28px;font-weight:600}
+.indic-name{flex:1;font-size:11px;color:var(--text)}
+.indic-peso{font-size:10px;color:var(--muted);min-width:30px;text-align:right}
 
-  .kpi.danger::before { background: var(--danger); }
-  .kpi.warn::before   { background: var(--warn); }
-  .kpi.ok::before     { background: var(--ok); }
-  .kpi.mid::before    { background: var(--mid); }
-  .kpi.accent::before { background: var(--accent); }
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);width:min(960px,98vw);padding:28px;position:relative}
+.modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.modal-title{font-family:var(--sans);font-weight:700;font-size:20px;color:var(--ink)}
+.modal-subtitle{font-size:11px;color:var(--muted);margin-top:4px}
+.modal-close{background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer;font-size:16px;padding:6px 12px;font-family:var(--mono)}
+.modal-close:hover{color:var(--text);border-color:var(--text)}
+.chart-container{position:relative;height:240px;margin-top:8px}
 
-  .kpi-label {
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
+/* DISCLAIMER */
+.disclaimer{background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);padding:16px 20px;margin-bottom:24px;font-size:11px;color:var(--text);line-height:1.8}
+.disclaimer strong{color:var(--warn)}
+.disclaimer-legal{background:var(--surface2);border:1px solid var(--border);padding:20px;margin-bottom:24px;font-size:11px;color:var(--muted);line-height:1.9}
+.disclaimer-legal h4{color:var(--text);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.disclaimer-legal a{color:var(--accent)}
+.disclaimer-legal strong{color:var(--text)}
 
-  .kpi-value {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 36px;
-    line-height: 1;
-    color: var(--ink);
-  }
+/* FOOTER */
+footer{margin-top:48px;border-top:1px solid var(--border);padding:32px;background:var(--surface)}
+.footer-inner{max-width:1500px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start}
+.author-avatar{width:64px;height:64px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:18px;color:var(--accent);flex-shrink:0}
+.author-name{font-family:var(--sans);font-weight:700;font-size:16px;color:var(--ink);margin-bottom:4px}
+.author-title{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6}
+.author-links{display:flex;gap:10px;flex-wrap:wrap}
+.author-link{padding:5px 12px;border:1px solid var(--border2);color:var(--muted);font-size:11px;text-decoration:none;transition:all .15s;font-family:var(--mono)}
+.author-link:hover{border-color:var(--accent);color:var(--accent)}
+.footer-copy{font-size:10px;color:var(--muted);margin-top:16px;letter-spacing:.06em}
 
-  .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+/* PODER TABS */
+.poder-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.poder-title{font-family:var(--sans);font-weight:700;font-size:18px;color:var(--ink)}
+.poder-stats{display:flex;gap:16px;font-size:11px;color:var(--muted)}
+.poder-stat-val{color:var(--ink);font-weight:600}
 
-  .section-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-  .table-wrap {
-    border: 1px solid var(--border);
-    overflow: auto;
-    max-height: 540px;
-    background: var(--surface);
-  }
-
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-
-  thead th {
-    background: var(--surface2);
-    padding: 9px 14px;
-    text-align: left;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-    position: sticky; top: 0;
-    cursor: pointer;
-    font-weight: 500;
-  }
-
-  thead th:hover { color: var(--text); }
-
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  tbody tr:hover { background: var(--surface2); }
-
-  td {
-    padding: 10px 14px;
-    color: var(--text);
-    white-space: nowrap;
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 2px;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    font-weight: 500;
-    text-transform: uppercase;
-    border: 1px solid;
-  }
-
-  .badge-CRÍTICO, .badge-CRITICO {
-    background: #f8e8e8; color: var(--danger);
-    border-color: rgba(139,32,32,0.3);
-  }
-  .badge-ALTO {
-    background: #fdf3e0; color: var(--warn);
-    border-color: rgba(139,94,0,0.3);
-  }
-  .badge-MEDIO {
-    background: #eeedf8; color: var(--mid);
-    border-color: rgba(61,53,128,0.3);
-  }
-  .badge-BAJO {
-    background: #e8f2e9; color: var(--ok);
-    border-color: rgba(26,92,42,0.3);
-  }
-
-  .score-bar { display: flex; align-items: center; gap: 8px; }
-  .bar-bg { flex: 1; height: 3px; background: var(--border); border-radius: 2px; min-width: 60px; }
-  .bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s; }
-  .bar-fill.danger { background: var(--danger); }
-  .bar-fill.warn   { background: var(--warn); }
-  .bar-fill.mid    { background: var(--mid); }
-  .bar-fill.ok     { background: var(--ok); }
-
-  .filters {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .filter-input, .filter-select {
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 7px 11px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .filter-input:focus, .filter-select:focus { border-color: var(--accent); }
-
-  .btn {
-    background: transparent;
-    border: 1px solid var(--border2);
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 7px 14px;
-    cursor: pointer;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    transition: all 0.15s;
-  }
-
-  .btn:hover, .btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  .btn-accent { border-color: var(--accent); color: var(--accent); }
-  .btn-accent:hover { background: var(--accent); color: #fff; }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-  @media(max-width:900px){ .two-col { grid-template-columns: 1fr; } }
-
-  .card {
-    border: 1px solid var(--border);
-    padding: 20px 22px;
-    background: var(--surface);
-  }
-
-  .card-title {
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 18px;
-    font-weight: 500;
-  }
-
-  .dist-grid {
-    display: grid;
-    grid-template-columns: repeat(4,1fr);
-    gap: 1px;
-    background: var(--border);
-  }
-
-  .dist-item { background: var(--surface); padding: 16px; text-align: center; }
-  .dist-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
-  .dist-count { font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--ink); }
-  .dist-pct   { font-size: 10px; color: var(--muted); margin-top: 4px; }
-
-  .judicial-note {
-    border-left: 3px solid var(--warn);
-    padding: 14px 18px;
-    margin-bottom: 20px;
-    background: #fdf8ed;
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-  }
-
-  .judicial-note-text { font-size: 12px; color: var(--text); line-height: 1.7; }
-  .judicial-note-text a { color: var(--accent); text-decoration: underline; }
-  .judicial-note-text strong { color: var(--ink); }
-
-  .anom-grid {
-    display: grid;
-    grid-template-columns: repeat(3,1fr);
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    margin-bottom: 24px;
-  }
-
-  .anom-item { background: var(--surface); padding: 18px 22px; }
-  .anom-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; }
-  .anom-val { font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--ink); }
-
-  .pagination {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-    margin-top: 14px;
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  .tag {
-    display: inline-block;
-    padding: 1px 6px;
-    background: #e8f2e9;
-    color: var(--ok);
-    font-size: 9px;
-    border-radius: 2px;
-    letter-spacing: 0.06em;
-    border: 1px solid rgba(26,92,42,0.2);
-    vertical-align: middle;
-    margin-left: 4px;
-  }
-
-  .tag-leg { background: #eeedf8; color: var(--mid); border-color: rgba(61,53,128,0.2); }
-
-  .loading { text-align:center; padding:36px; color:var(--muted); font-size:12px; letter-spacing:0.1em; }
-  .error-msg { padding:14px 18px; border:1px solid rgba(139,32,32,0.3); color:var(--danger); font-size:12px; background:#f8e8e8; }
-
-  ::-webkit-scrollbar { width:5px; height:5px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius:3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-  .divider { border:none; border-top:1px solid var(--border); margin:24px 0; }
+.ctx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.ctx-item{background:var(--surface2);border:1px solid var(--border);padding:14px}
+.ctx-label{font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:.08em;text-transform:uppercase}
+.ctx-val{font-family:var(--sans);font-weight:700;font-size:20px;color:var(--ink)}
+.ctx-ref{font-size:10px;color:var(--muted);margin-top:4px}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">
-    Monitor DDJJ
-    <span class="logo-sub">/ Argentina</span>
-  </div>
-  <div class="header-right">
-    <span><span class="live-dot"></span>datos.jus.gob.ar · 2024</span>
-    <span id="clock">--:--:--</span>
-  </div>
+  <div class="logo"><div class="logo-dot"></div>Monitor<span class="logo-accent">DDJJ</span><span style="font-size:11px;color:var(--muted);font-weight:400">/ Argentina 2024</span></div>
+  <div class="header-right"><span>datos.jus.gob.ar · OA</span><span id="clock">--:--:--</span></div>
 </header>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('resumen',this)">Resumen</div>
-  <div class="tab" onclick="switchTab('scoring',this)">Scoring</div>
-  <div class="tab" onclick="switchTab('alertas',this)">Alertas</div>
+  <div class="tab" onclick="switchTab('ejecutivo',this)">Poder Ejecutivo</div>
+  <div class="tab" onclick="switchTab('legislativo',this)">Poder Legislativo</div>
   <div class="tab" onclick="switchTab('judicial',this)">Poder Judicial</div>
+  <div class="tab" onclick="switchTab('indicadores',this)">Indicadores Int.</div>
+  <div class="tab" onclick="switchTab('alertas',this)">Alertas</div>
   <div class="tab" onclick="switchTab('anomalias',this)">Anomalías ML</div>
 </div>
 
-<!-- RESUMEN -->
+<!-- ══ RESUMEN ══ -->
 <div id="tab-resumen" class="content active">
+  <div class="disclaimer">
+    ⚠️ <strong>Nota:</strong> Esta herramienta es de carácter <strong>experimental y académico</strong>. Los datos provienen de fuentes públicas oficiales del Estado argentino y organismos internacionales. Los resultados son <strong>indicadores algorítmicos de riesgo</strong> — no implican juicio de valor, acusación ni determinación de responsabilidad sobre ninguna empresa, organismo o persona. El objetivo es promover la <strong>transparencia y el debate informado</strong> sobre el gasto público.
+  </div>
   <div id="kpi-grid" class="kpi-grid"><div class="loading">Cargando datos</div></div>
   <div class="two-col">
-    <div class="card">
-      <div class="card-title">Distribución de riesgo — Fase 3</div>
-      <div id="dist-f3"><div class="loading">Cargando</div></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Cobertura por poder del Estado</div>
-      <div id="cobertura-poderes" style="padding:4px 0"></div>
-    </div>
+    <div class="card"><div class="card-title">Distribución de riesgo — IVPI</div><div id="dist-f3"><div class="loading">Cargando</div></div></div>
+    <div class="card"><div class="card-title">Cobertura por poder del Estado</div><div id="cobertura-poderes" style="padding:4px 0"></div></div>
   </div>
-  <div class="section-title">Top 10 funcionarios — mayor score de riesgo</div>
+  <div class="section-title">Top 10 — mayor score de riesgo</div>
   <div class="table-wrap">
     <table id="top10-table">
-      <thead><tr>
-        <th>Funcionario</th><th>Organismo</th><th>Cargo</th>
-        <th>IVPI</th><th>Score</th><th>Nivel</th>
-      </tr></thead>
-      <tbody><tr><td colspan="6" class="loading">Cargando</td></tr></tbody>
+      <thead><tr><th>Funcionario</th><th>Organismo</th><th>Cargo</th><th>PN Inicial</th><th>PN Final</th><th>IVPI</th><th>Score</th><th>Nivel</th></tr></thead>
+      <tbody><tr><td colspan="8" class="loading">Cargando</td></tr></tbody>
     </table>
+  </div>
+  <div class="disclaimer-legal" style="margin-top:28px">
+    <h4>⚖ Marco Legal y Transparencia</h4>
+    Los datos publicados en este portal provienen exclusivamente de fuentes oficiales del Estado argentino. Su reutilización está amparada por la <strong>Ley 27.275 de Acceso a la Información Pública</strong> y el <strong>Decreto 1172/2003</strong> sobre libre acceso a la información pública en el Poder Ejecutivo Nacional.<br><br>
+    En relación con la <strong>Ley 25.326 de Protección de Datos Personales</strong>, este portal procesa únicamente información de funcionarios públicos en ejercicio de sus funciones, excluida del ámbito de protección individual conforme al art. 2 de dicha ley y a la doctrina consolidada de la <strong>Agencia de Acceso a la Información Pública (AAIP)</strong>. Los datos curriculares de magistrados corresponden a declaración obligatoria ante el Consejo de la Magistratura (Ley 27.275, art. 16). Los CUIT de personas jurídicas son datos fiscales públicos no alcanzados por la Ley 25.326.<br><br>
+    Las sanciones internacionales exhibidas corresponden a resoluciones firmes de organismos judiciales o regulatorios extranjeros de acceso público (<strong>DOJ · SFO · PNF · OCDE · Banco Mundial</strong>). Su cruce con el registro COMPR.AR tiene exclusivamente fines de análisis de riesgo académico y no implica imputación de responsabilidad en jurisdicción argentina.<br><br>
+    Los indicadores, índices y alertas son el resultado de <strong>análisis algorítmico sobre datos oficiales</strong> y no constituyen imputaciones, acusaciones ni determinaciones de responsabilidad penal, civil o administrativa. No reemplazan los mecanismos formales de control del Estado (AGN · SIGEN · Ministerio Público Fiscal). Para consultas sobre el tratamiento de datos: <a href="mailto:vhmonte@retina.ar">vhmonte@retina.ar</a>
   </div>
 </div>
 
-<!-- SCORING -->
-<div id="tab-scoring" class="content">
+<!-- ══ EJECUTIVO ══ -->
+<div id="tab-ejecutivo" class="content">
+  <div class="poder-header">
+    <div><div class="poder-title">Poder Ejecutivo Nacional</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Ministerios · Organismos · Fuerzas de seguridad · Universidades</div></div>
+    <div class="poder-stats"><span>Total: <span class="poder-stat-val" id="ej-total">—</span></span><span>Alto riesgo: <span class="poder-stat-val" id="ej-alto" style="color:var(--warn)">—</span></span></div>
+  </div>
   <div class="filters">
-    <input class="filter-input" id="sc-search" placeholder="Buscar nombre u organismo..."
-           style="width:260px" oninput="filterScoring()">
-    <select class="filter-select" id="sc-nivel" onchange="filterScoring()">
-      <option value="">Todos los niveles</option>
-      <option>CRÍTICO</option><option>ALTO</option><option>MEDIO</option><option>BAJO</option>
+    <input class="filter-input" id="ej-search" placeholder="Buscar funcionario u organismo..." style="width:260px" oninput="filterPoder('ejecutivo')">
+    <select class="filter-select" id="ej-org" onchange="filterPoder('ejecutivo')"><option value="">Todos los organismos</option></select>
+    <select class="filter-select" id="ej-nivel" onchange="filterPoder('ejecutivo')">
+      <option value="">Todos los niveles</option><option>CRÍTICO</option><option>ALTO</option><option>MEDIO</option><option>BAJO</option>
     </select>
-    <select class="filter-select" id="sc-poder" onchange="filterScoring()">
-      <option value="">Todos los poderes</option>
-      <option value="EJECUTIVO">Ejecutivo</option>
-      <option value="LEGISLATIVO">Legislativo</option>
-      <option value="JUDICIAL">Judicial</option>
-    </select>
-    <span id="sc-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+    <span id="ej-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
   </div>
   <div class="table-wrap">
-    <table id="scoring-table">
-      <thead><tr>
-        <th>Funcionario</th><th>Organismo</th><th>Cargo</th><th>Año</th>
-        <th>PN Inicial</th><th>PN Final</th>
-        <th onclick="sortSc(6)">IVPI ↕</th>
-        <th onclick="sortSc(7)">Score ↕</th>
-        <th>Nivel</th>
-      </tr></thead>
-      <tbody><tr><td colspan="9" class="loading">Cargando</td></tr></tbody>
+    <table id="ej-table">
+      <thead><tr><th>Funcionario</th><th>Organismo</th><th>Cargo</th><th>PN Inicial</th><th>PN Final</th><th>Δ $</th><th>Δ USD</th><th>IVPI</th><th>Score</th><th>Nivel</th></tr></thead>
+      <tbody><tr><td colspan="10" class="loading">Cargando</td></tr></tbody>
     </table>
   </div>
-  <div class="pagination">
-    <button class="btn" onclick="scoringPage(-1)">← Anterior</button>
-    <span id="sc-page-info"></span>
-    <button class="btn" onclick="scoringPage(1)">Siguiente →</button>
+  <div class="pagination"><button class="btn" onclick="poderPage('ejecutivo',-1)">← Anterior</button><span id="ej-page-info"></span><button class="btn" onclick="poderPage('ejecutivo',1)">Siguiente →</button></div>
+</div>
+
+<!-- ══ LEGISLATIVO ══ -->
+<div id="tab-legislativo" class="content">
+  <div class="poder-header">
+    <div><div class="poder-title">Poder Legislativo</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Cámara de Diputados · Senado de la Nación</div></div>
+    <div class="poder-stats"><span>Total: <span class="poder-stat-val" id="leg-total">—</span></span><span>Alto riesgo: <span class="poder-stat-val" id="leg-alto" style="color:var(--warn)">—</span></span></div>
+  </div>
+  <div class="filters">
+    <input class="filter-input" id="leg-search" placeholder="Buscar legislador u organismo..." style="width:260px" oninput="filterPoder('legislativo')">
+    <select class="filter-select" id="leg-org" onchange="filterPoder('legislativo')"><option value="">Todos</option></select>
+    <select class="filter-select" id="leg-nivel" onchange="filterPoder('legislativo')">
+      <option value="">Todos los niveles</option><option>CRÍTICO</option><option>ALTO</option><option>MEDIO</option><option>BAJO</option>
+    </select>
+    <span id="leg-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="leg-table">
+      <thead><tr><th>Legislador</th><th>Cámara</th><th>Cargo</th><th>PN Inicial</th><th>PN Final</th><th>Δ $</th><th>Δ USD</th><th>IVPI</th><th>Score</th><th>Nivel</th></tr></thead>
+      <tbody><tr><td colspan="10" class="loading">Cargando</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination"><button class="btn" onclick="poderPage('legislativo',-1)">← Anterior</button><span id="leg-page-info"></span><button class="btn" onclick="poderPage('legislativo',1)">Siguiente →</button></div>
+</div>
+
+<!-- ══ JUDICIAL ══ -->
+<div id="tab-judicial" class="content">
+  <div class="judicial-note">
+    <div style="font-size:18px;padding-top:2px">⚖</div>
+    <div class="judicial-note-text">
+      Los magistrados presentan DDJJ ante el <strong>Consejo de la Magistratura</strong> — Anexo Reservado en papel + Anexo Público digital. Patrimonio no disponible en bulk. →
+      <a href="https://consejomagistratura.gov.ar/index.php/declaraciones-juradas-patrimoniales/" target="_blank">Consultar individualmente</a>
+    </div>
+  </div>
+  <div class="poder-header">
+    <div><div class="poder-title">Poder Judicial</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Jueces · Fiscales · Defensores · Magistrados federales</div></div>
+    <div class="poder-stats"><span>Con DDJJ OA: <span class="poder-stat-val" id="jud-total-oa">—</span></span><span>Magistrados: <span class="poder-stat-val" id="jud-total-mag">—</span></span></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn active" id="jud-btn-oa" onclick="switchJudicial('oa',this)">Con DDJJ (OA)</button>
+    <button class="btn" id="jud-btn-mag" onclick="switchJudicial('magistrados',this)">Nómina magistrados</button>
+  </div>
+
+  <!-- Con DDJJ -->
+  <div id="jud-oa-section">
+    <div class="filters">
+      <input class="filter-input" id="joa-search" placeholder="Buscar..." style="width:240px" oninput="filterPoder('judicial')">
+      <select class="filter-select" id="joa-nivel" onchange="filterPoder('judicial')">
+        <option value="">Todos los niveles</option><option>CRÍTICO</option><option>ALTO</option><option>MEDIO</option><option>BAJO</option>
+      </select>
+      <span id="joa-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="joa-table">
+        <thead><tr><th>Funcionario</th><th>Organismo</th><th>Cargo</th><th>PN Inicial</th><th>PN Final</th><th>Δ $</th><th>Δ USD</th><th>IVPI</th><th>Score</th><th>Nivel</th></tr></thead>
+        <tbody><tr><td colspan="10" class="loading">Cargando</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination"><button class="btn" onclick="poderPage('judicial',-1)">← Anterior</button><span id="joa-page-info"></span><button class="btn" onclick="poderPage('judicial',1)">Siguiente →</button></div>
+  </div>
+
+  <!-- Magistrados -->
+  <div id="jud-mag-section" style="display:none">
+    <div class="filters">
+      <input class="filter-input" id="mag-search" placeholder="Buscar magistrado..." style="width:240px" oninput="filterMagistrados()">
+      <select class="filter-select" id="mag-tipo" onchange="filterMagistrados()"><option value="">Todos los cargos</option><option>Juez</option><option>Fiscal</option><option>Defensor</option></select>
+      <select class="filter-select" id="mag-prov" onchange="filterMagistrados()"><option value="">Todas las provincias</option></select>
+      <span id="mag-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="mag-table">
+        <thead><tr><th>Magistrado</th><th>Cargo</th><th>Órgano</th><th>Cámara</th><th>Provincia</th><th>Fecha jura</th><th>DDJJ</th></tr></thead>
+        <tbody><tr><td colspan="7" class="loading">Cargando</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination"><button class="btn" onclick="magPageNav(-1)">← Anterior</button><span id="mag-page-info"></span><button class="btn" onclick="magPageNav(1)">Siguiente →</button></div>
   </div>
 </div>
 
-<!-- ALERTAS -->
+<!-- ══ INDICADORES ══ -->
+<div id="tab-indicadores" class="content">
+  <div class="ctx-grid">
+    <div class="ctx-item"><div class="ctx-label">CPI TI 2023</div><div class="ctx-val">38<span style="font-size:14px;color:var(--muted)">/100</span></div><div class="ctx-ref">Promedio LAC: 43</div></div>
+    <div class="ctx-item"><div class="ctx-label">WB CCI Percentil</div><div class="ctx-val">43.8<span style="font-size:14px;color:var(--muted)">%</span></div><div class="ctx-ref">Promedio LAC: 49.3%</div></div>
+    <div class="ctx-item"><div class="ctx-label">FATF Estado</div><div class="ctx-val" style="font-size:14px;color:var(--green)">Lista gris</div><div class="ctx-ref">Retirada 2023</div></div>
+    <div class="ctx-item"><div class="ctx-label">OCDE Miembro</div><div class="ctx-val" style="font-size:14px;color:var(--warn)">No</div><div class="ctx-ref">Adherente PAC</div></div>
+  </div>
+  <div class="section-title">Scores promedio por marco</div>
+  <div class="marcos-grid" id="marcos-grid"><div class="loading" style="grid-column:1/-1">Cargando</div></div>
+  <div class="two-col">
+    <div class="card"><div class="card-title">Distribución — score internacional</div><div id="dist-int"><div class="loading">Cargando</div></div></div>
+    <div class="card"><div class="card-title">Alertas rojas por indicador</div><div id="alertas-ind" style="padding:4px 0"></div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--accent)">Grupo A — FATF/GAFI (30%)</div>
+      <div id="ind-fatf"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--teal)">Grupo B — World Bank CCI (20%)</div>
+      <div id="ind-wb"></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--green)">Grupo C — Transparency International (15%)</div>
+      <div id="ind-ti"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--mid)">Grupo D — OCDE Integridad Pública (35%)</div>
+      <div id="ind-ocde"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ALERTAS ══ -->
 <div id="tab-alertas" class="content">
   <div class="filters">
     <button class="btn active" id="btn-puertas" onclick="loadAlertas('PUERTAS',this)">Puertas giratorias</button>
     <button class="btn" id="btn-conflicto" onclick="loadAlertas('CONFLICTO',this)">Conflicto de interés</button>
-    <input class="filter-input" id="al-search" placeholder="Buscar..."
-           style="width:220px;margin-left:auto" oninput="filterAlertas()">
+    <input class="filter-input" id="al-search" placeholder="Buscar..." style="width:220px;margin-left:auto" oninput="filterAlertas()">
   </div>
-  <div id="alertas-count" style="color:var(--muted);font-size:11px;margin-bottom:14px"></div>
+  <div id="alertas-count" style="color:var(--muted);font-size:11px;margin-bottom:12px"></div>
   <div class="table-wrap">
-    <table id="alertas-table">
-      <thead><tr id="alertas-header"></tr></thead>
-      <tbody><tr><td colspan="6" class="loading">Cargando</td></tr></tbody>
-    </table>
+    <table id="alertas-table"><thead><tr id="alertas-header"></tr></thead><tbody><tr><td colspan="6" class="loading">Cargando</td></tr></tbody></table>
   </div>
-  <div class="pagination">
-    <button class="btn" onclick="alertasPage(-1)">← Anterior</button>
-    <span id="al-page-info"></span>
-    <button class="btn" onclick="alertasPage(1)">Siguiente →</button>
-  </div>
+  <div class="pagination"><button class="btn" onclick="alertasPage(-1)">← Anterior</button><span id="al-page-info"></span><button class="btn" onclick="alertasPage(1)">Siguiente →</button></div>
 </div>
 
-<!-- JUDICIAL -->
-<div id="tab-judicial" class="content">
-  <div class="judicial-note">
-    <div style="font-size:18px;margin-top:2px">⚖</div>
-    <div class="judicial-note-text">
-      Los magistrados presentan su DDJJ ante el <strong>Consejo de la Magistratura</strong>.
-      El Anexo Patrimonial es <strong>reservado</strong> — no disponible en bulk.
-      Consulta individual en:
-      <a href="https://consejomagistratura.gov.ar/index.php/declaraciones-juradas-patrimoniales/" target="_blank">
-        consejomagistratura.gov.ar →
-      </a>
-    </div>
-  </div>
-  <div class="filters">
-    <input class="filter-input" id="jud-search" placeholder="Buscar magistrado u órgano..."
-           style="width:270px" oninput="filterJudicial()">
-    <select class="filter-select" id="jud-tipo" onchange="filterJudicial()">
-      <option value="">Todos los cargos</option>
-      <option>Juez</option><option>Fiscal</option><option>Defensor</option>
-    </select>
-    <select class="filter-select" id="jud-prov" onchange="filterJudicial()">
-      <option value="">Todas las provincias</option>
-    </select>
-    <span id="jud-count" style="color:var(--muted);font-size:11px;margin-left:auto"></span>
-  </div>
-  <div class="table-wrap">
-    <table id="judicial-table">
-      <thead><tr>
-        <th>Magistrado</th><th>Cargo</th><th>Órgano</th>
-        <th>Cámara</th><th>Provincia</th><th>Fecha jura</th><th>DDJJ</th>
-      </tr></thead>
-      <tbody><tr><td colspan="7" class="loading">Cargando</td></tr></tbody>
-    </table>
-  </div>
-  <div class="pagination">
-    <button class="btn" onclick="judicialPage(-1)">← Anterior</button>
-    <span id="jud-page-info"></span>
-    <button class="btn" onclick="judicialPage(1)">Siguiente →</button>
-  </div>
-</div>
-
-<!-- ANOMALÍAS -->
+<!-- ══ ANOMALÍAS ══ -->
 <div id="tab-anomalias" class="content">
-  <div id="anom-kpis" class="anom-grid">
-    <div class="loading" style="grid-column:1/-1">Cargando</div>
-  </div>
+  <div id="anom-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:24px"><div class="loading" style="grid-column:1/-1">Cargando</div></div>
   <div class="section-title">Anomalías por consenso IF ∩ SVM</div>
   <div class="table-wrap">
     <table id="anomalias-table">
-      <thead><tr>
-        <th>Funcionario</th><th>Organismo</th>
-        <th>Score riesgo</th><th>IF score</th>
-        <th>IVPI</th><th>PN final</th><th>Nivel</th>
-      </tr></thead>
+      <thead><tr><th>Funcionario</th><th>Organismo</th><th>Score riesgo</th><th>IF score</th><th>IVPI</th><th>PN final</th><th>Nivel</th></tr></thead>
       <tbody><tr><td colspan="7" class="loading">Cargando</td></tr></tbody>
     </table>
   </div>
 </div>
 
+<!-- ══ MODAL FICHA ══ -->
+<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-nombre">—</div>
+        <div class="modal-subtitle" id="modal-cargo">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕ cerrar</button>
+    </div>
+
+    <div class="three-col" id="modal-kpis"></div>
+
+    <div class="section-title" style="margin-top:20px">Evolución patrimonial 2022 → 2023 → 2024</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px">Hover para ver valores exactos · TC USD fijo $900 para comparación real</div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="chart-container" style="height:280px"><canvas id="chart-evolucion"></canvas></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Composición de ingresos 2024</div>
+        <div class="chart-container" style="height:200px"><canvas id="chart-ingresos"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Score de riesgo por marco internacional</div>
+        <div class="chart-container" style="height:200px"><canvas id="chart-radar"></canvas></div>
+      </div>
+    </div>
+
+    <div class="section-title">Análisis de justificación patrimonial</div>
+    <div id="modal-analisis"></div>
+
+    <div class="section-title" style="margin-top:20px">Campos declarados 2024</div>
+    <div id="modal-campos" class="table-wrap" style="max-height:300px"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="author-avatar">VM</div>
+    <div>
+      <div class="author-name">Ph.D. Vicente Humberto Monteverde</div>
+      <div class="author-title">
+        Investigador en economía política y fenómenos de corrupción. Doctor en Ciencias Económicas.<br>
+        Autor de la teoría de <em>Transferencia Regresiva de Ingresos</em> y desarrollador del algoritmo XAI aplicado al análisis de contrataciones públicas.<br>
+        Publicaciones en <em>Journal of Financial Crime</em> (Emerald Publishing). Asesor en transparencia y auditoría algorítmica del gasto público.
+      </div>
+      <div class="author-links">
+        <a href="mailto:vhmonte@retina.ar" class="author-link">✉ vhmonte@retina.ar</a>
+        <a href="mailto:viny01958@gmail.com" class="author-link">✉ viny01958@gmail.com</a>
+        <a href="https://github.com/Viny2030/decla" target="_blank" class="author-link">⌥ GitHub</a>
+      </div>
+      <div class="footer-copy">Monitor DDJJ · Datos: datos.jus.gob.ar (OA) · Licencia: CC BY 4.0 · Uso académico y periodístico</div>
+    </div>
+  </div>
+</footer>
+
 <script>
-const PAGE = 50;
-let scData=[], scFiltered=[], scPage=0, scSortCol=-1, scSortAsc=false;
-let alData=[], alFiltered=[], alPage=0;
-let judData=[], judFiltered=[], judPage=0;
+const PAGE=50,TC=900;
+const poderes={ejecutivo:{data:[],filtered:[],page:0},legislativo:{data:[],filtered:[],page:0},judicial:{data:[],filtered:[],page:0}};
+let alData=[],alFiltered=[],alPage=0;
+let magData=[],magFiltered=[],magPageNum=0;
+let charts={};
 
-function updateClock(){
-  document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('es-AR',{hour12:false});
-}
-setInterval(updateClock,1000); updateClock();
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-AR',{hour12:false});}
+setInterval(updateClock,1000);updateClock();
 
-function switchTab(name,el){
+function switchTab(n,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tab-'+n).classList.add('active');
 }
 
 async function api(url){
-  try{const r=await fetch(url); if(!r.ok) throw new Error(r.status); return await r.json();}
+  try{const r=await fetch(url);if(!r.ok)throw new Error(r.status);return await r.json();}
   catch{return null;}
 }
 
-function fmt(n,d=0){
-  if(n==null||isNaN(n)) return '—';
-  return Number(n).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+function fmt(n,d=0){if(n==null||isNaN(n)||n===''||n===undefined)return'—';const v=Number(n);if(isNaN(v))return'—';return v.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+function fmtM(n,currency='$'){
+  if(n==null||isNaN(n)||n===''||n===undefined)return'—';
+  const v=Number(n);if(isNaN(v)||v===0)return currency+'0';
+  const abs=Math.abs(v);
+  const sign=v<0?'-':'';
+  if(abs>=1e9)return sign+currency+(abs/1e9).toFixed(2)+'B';
+  if(abs>=1e6)return sign+currency+(abs/1e6).toFixed(1)+'M';
+  if(abs>=1e3)return sign+currency+Math.round(abs/1e3)+'K';
+  return sign+currency+fmt(abs);
 }
 
-function badge(nivel){
-  const k=(nivel||'').replace('Í','I').replace('É','E');
-  return `<span class="badge badge-${k}">${nivel||'—'}</span>`;
-}
+function fmtU(n){return fmtM(n,'USD ');}
+
+function badge(n){const k=(n||'').replace('Í','I').replace('É','E');return`<span class="badge badge-${k}">${n||'—'}</span>`;}
 
 function bar(val,max=100){
   const p=Math.min(100,Math.max(0,(val/max)*100));
-  const cls=p>=70?'danger':p>=45?'warn':p>=20?'mid':'ok';
-  return `<div class="score-bar"><div class="bar-bg"><div class="bar-fill ${cls}" style="width:${p}%"></div></div>
-  <span style="min-width:28px;text-align:right;color:var(--text)">${fmt(val)}</span></div>`;
+  const c=p>=70?'danger':p>=45?'warn':p>=20?'mid':'ok';
+  return`<div class="score-bar"><div class="bar-bg"><div class="bar-fill ${c}" style="width:${p}%"></div></div><span style="min-width:26px;text-align:right;color:var(--text)">${fmt(val)}</span></div>`;
 }
 
 function poderTag(org){
-  if(!org) return '';
-  const u=org.toUpperCase();
-  if(u.includes('SENADO')||u.includes('DIPUTADOS')||u.includes('LEGISLAT'))
-    return '<span class="tag tag-leg">LEG</span>';
-  if(u.includes('JUDICIAL')||u.includes('TRIBUNAL')||u.includes('MAGISTRATURA'))
-    return '<span class="tag">JUD</span>';
-  return '';
+  if(!org)return'';const u=org.toUpperCase();
+  if(u.includes('SENADO')||u.includes('DIPUTADOS')||u.includes('LEGISLAT'))return'<span class="tag tag-leg">LEG</span>';
+  if(u.includes('JUDICIAL')||u.includes('TRIBUNAL')||u.includes('MAGISTRATURA'))return'<span class="tag tag-jud">JUD</span>';
+  return'';
 }
 
+// ── RESUMEN ──────────────────────────────────────────────────────────────
 async function loadResumen(){
   const d=await api('/api/resumen');
-  if(!d){
-    document.getElementById('kpi-grid').innerHTML='<div class="error-msg">Error al cargar. ¿Está corriendo la API?</div>';
-    return;
-  }
-  const dist=d.distribucion_riesgo_f3||{};
-  const total=d.total_funcionarios||0;
-
+  if(!d){document.getElementById('kpi-grid').innerHTML='<div class="error-msg">Error al cargar. Accedé desde http://127.0.0.1:8000</div>';return;}
+  const dist=d.distribucion_riesgo_f3||{};const total=d.total_funcionarios||0;
   document.getElementById('kpi-grid').innerHTML=`
-    <div class="kpi danger">
-      <div class="kpi-label">Anomalías ML</div>
-      <div class="kpi-value">${fmt(d.anomalias_ml)}</div>
-      <div class="kpi-sub">Consenso IF ∩ SVM</div>
-    </div>
-    <div class="kpi warn">
-      <div class="kpi-label">Riesgo alto</div>
-      <div class="kpi-value">${fmt(dist['ALTO']||0)}</div>
-      <div class="kpi-sub">IVPI &gt; 1.5×</div>
-    </div>
-    <div class="kpi mid">
-      <div class="kpi-label">Riesgo medio</div>
-      <div class="kpi-value">${fmt(dist['MEDIO']||0)}</div>
-      <div class="kpi-sub">IVPI 1.0–1.5×</div>
-    </div>
-    <div class="kpi accent">
-      <div class="kpi-label">Total funcionarios</div>
-      <div class="kpi-value">${fmt(total)}</div>
-      <div class="kpi-sub">DDJJ 2024 normalizadas</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Alertas puertas</div>
-      <div class="kpi-value">${fmt(d.alertas_puertas)}</div>
-      <div class="kpi-sub">Rotación público/privado</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Alertas conflicto</div>
-      <div class="kpi-value">${fmt(d.alertas_conflicto)||'0'}</div>
-      <div class="kpi-sub">Contrataciones cruzadas</div>
-    </div>`;
-
-  const colors={'CRÍTICO':['#f8e8e8','var(--danger)'],'ALTO':['#fdf3e0','var(--warn)'],'MEDIO':['#eeedf8','var(--mid)'],'BAJO':['#e8f2e9','var(--ok)']};
-  document.getElementById('dist-f3').innerHTML='<div class="dist-grid">'+
-    ['CRÍTICO','ALTO','MEDIO','BAJO'].map(k=>{
-      const v=dist[k]||0;
-      const pct=total?((v/total)*100).toFixed(1):0;
-      return `<div class="dist-item">
-        <div class="dist-label" style="color:${colors[k][1]}">${k}</div>
-        <div class="dist-count">${fmt(v)}</div>
-        <div class="dist-pct">${pct}%</div>
-      </div>`;
+    <div class="kpi danger"><div class="kpi-label">Anomalías ML</div><div class="kpi-value">${fmt(d.anomalias_ml)}</div><div class="kpi-sub">Consenso IF ∩ SVM</div></div>
+    <div class="kpi warn"><div class="kpi-label">Riesgo ALTO</div><div class="kpi-value">${fmt(dist['ALTO']||0)}</div><div class="kpi-sub">IVPI &gt; 1.5×</div></div>
+    <div class="kpi mid"><div class="kpi-label">Riesgo MEDIO</div><div class="kpi-value">${fmt(dist['MEDIO']||0)}</div><div class="kpi-sub">IVPI 1.0–1.5×</div></div>
+    <div class="kpi green"><div class="kpi-label">Total funcionarios</div><div class="kpi-value">${fmt(total)}</div><div class="kpi-sub">DDJJ 2024 normalizadas</div></div>
+    <div class="kpi teal"><div class="kpi-label">Alertas puertas</div><div class="kpi-value">${fmt(d.alertas_puertas)}</div><div class="kpi-sub">Rotación público/privado</div></div>
+    <div class="kpi blue"><div class="kpi-label">Funcionarios BAJO</div><div class="kpi-value">${fmt(dist['BAJO']||0)}</div><div class="kpi-sub">Sin indicadores de riesgo</div></div>`;
+  const colors={'CRÍTICO':'var(--danger)','ALTO':'var(--warn)','MEDIO':'var(--mid)','BAJO':'var(--green)'};
+  document.getElementById('dist-f3').innerHTML='<div class="dist-grid">'+['CRÍTICO','ALTO','MEDIO','BAJO'].map(k=>{
+    const v=dist[k]||0;const pct=total?((v/total)*100).toFixed(1):0;
+    return`<div class="dist-item"><div class="dist-label" style="color:${colors[k]}">${k}</div><div class="dist-count">${fmt(v)}</div><div class="dist-pct">${pct}%</div></div>`;
+  }).join('')+'</div>';
+  document.getElementById('cobertura-poderes').innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+
+    [{l:'Poder Ejecutivo',v:65000,t:total,c:'var(--accent)'},{l:'Poder Legislativo',v:452,t:total,c:'var(--mid)'},
+     {l:'Judicial (con DDJJ OA)',v:258,t:total,c:'var(--teal)'},{l:'Magistrados (sin DDJJ pública)',v:895,t:895,c:'var(--muted)'}]
+    .map(p=>{const pct=p.l.includes('Magistr')?100:Math.min(100,(p.v/p.t)*100);
+      return`<div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px">${p.l}</span><span style="font-size:11px;color:var(--muted)">${fmt(p.v)}</span></div>
+      <div class="bar-bg" style="height:5px"><div style="height:100%;width:${pct}%;background:${p.c};border-radius:2px;transition:width 1s"></div></div></div>`;
     }).join('')+'</div>';
-
-  document.getElementById('cobertura-poderes').innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:14px">
-      ${[
-        {l:'Poder Ejecutivo',v:65000,t:total,c:'var(--accent)'},
-        {l:'Poder Legislativo',v:452,t:total,c:'var(--mid)'},
-        {l:'Judicial (administrativo)',v:258,t:total,c:'var(--warn)'},
-        {l:'Magistrados (sin DDJJ pública)',v:895,t:895,c:'var(--muted)'},
-      ].map(p=>{
-        const pct=p.l.includes('Magistr')?100:Math.min(100,(p.v/p.t)*100);
-        return `<div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-            <span style="font-size:11px;color:var(--text)">${p.l}</span>
-            <span style="font-size:11px;color:var(--muted)">${fmt(p.v)}</span>
-          </div>
-          <div class="bar-bg" style="height:5px">
-            <div style="height:100%;width:${pct}%;background:${p.c};border-radius:2px;transition:width 1s"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-
   loadTop10();
 }
 
 async function loadTop10(){
   const d=await api('/api/scoring?limite=10');
-  if(!d||!d.datos) return;
-  document.querySelector('#top10-table tbody').innerHTML=d.datos.map(r=>`<tr>
-    <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,30)}${poderTag(r.organismo)}</td>
-    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
-    <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,22)}</td>
+  if(!d||!d.datos)return;
+  document.querySelector('#top10-table tbody').innerHTML=d.datos.map(r=>`<tr onclick='openModal(${JSON.stringify(r)})'>
+    <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,26)}${poderTag(r.organismo)}</td>
+    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,22)}</td>
+    <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,20)}</td>
+    <td>${fmtM(r.total_bienes_inicio)}</td><td>${fmtM(r.total_bienes_final)}</td>
     <td style="color:${r.ivpi>3?'var(--danger)':r.ivpi>1.5?'var(--warn)':'var(--text)'}">${fmt(r.ivpi,2)}</td>
-    <td>${bar(r.score_riesgo)}</td>
-    <td>${badge(r.nivel_riesgo)}</td>
+    <td>${bar(r.score_riesgo)}</td><td>${badge(r.nivel_riesgo)}</td>
   </tr>`).join('');
 }
 
-async function loadScoring(){
-  const d=await api('/api/scoring?limite=500');
-  if(!d||!d.datos) return;
-  scData=d.datos; filterScoring();
+// ── PODERES ───────────────────────────────────────────────────────────────
+const poderConfig={
+  ejecutivo:{api:'EJECUTIVO',tableId:'ej-table',countId:'ej-count',pageId:'ej-page-info',searchId:'ej-search',nivelId:'ej-nivel',orgId:'ej-org',totalId:'ej-total',altoId:'ej-alto'},
+  legislativo:{api:'LEGISLATIVO',tableId:'leg-table',countId:'leg-count',pageId:'leg-page-info',searchId:'leg-search',nivelId:'leg-nivel',orgId:'leg-org',totalId:'leg-total',altoId:'leg-alto'},
+  judicial:{api:'JUDICIAL',tableId:'joa-table',countId:'joa-count',pageId:'joa-page-info',searchId:'joa-search',nivelId:'joa-nivel',orgId:null,totalId:'jud-total-oa',altoId:null},
+};
+
+async function loadPoder(nombre){
+  const cfg=poderConfig[nombre];
+  const d=await api(`/api/poder/${cfg.api}?limite=500`);
+  if(!d||!d.datos){document.querySelector(`#${cfg.tableId} tbody`).innerHTML='<tr><td colspan="10" class="error-msg">Sin datos</td></tr>';return;}
+  poderes[nombre].data=d.datos;
+  if(cfg.totalId)document.getElementById(cfg.totalId).textContent=fmt(d.total);
+  if(cfg.altoId){const alto=d.datos.filter(r=>r.nivel_riesgo==='ALTO'||r.nivel_riesgo==='CRÍTICO').length;document.getElementById(cfg.altoId).textContent=fmt(alto);}
+  // Organismos
+  if(cfg.orgId){
+    const orgs=[...new Set(d.datos.map(r=>r.organismo).filter(Boolean))].sort();
+    const sel=document.getElementById(cfg.orgId);
+    sel.innerHTML='<option value="">Todos los organismos</option>'+orgs.slice(0,80).map(o=>`<option>${o}</option>`).join('');
+  }
+  filterPoder(nombre);
 }
 
-function filterScoring(){
-  const q=(document.getElementById('sc-search').value||'').toLowerCase();
-  const niv=document.getElementById('sc-nivel').value;
-  const pod=document.getElementById('sc-poder').value;
-  scFiltered=scData.filter(r=>{
-    const org=(r.organismo||'').toUpperCase();
+function filterPoder(nombre){
+  const cfg=poderConfig[nombre];
+  const q=(document.getElementById(cfg.searchId).value||'').toLowerCase();
+  const niv=document.getElementById(cfg.nivelId).value;
+  const org=cfg.orgId?document.getElementById(cfg.orgId).value:'';
+  poderes[nombre].filtered=poderes[nombre].data.filter(r=>{
     const mQ=!q||(r.funcionario_apellido_nombre||'').toLowerCase().includes(q)||(r.organismo||'').toLowerCase().includes(q);
     const mN=!niv||r.nivel_riesgo===niv;
-    let mP=true;
-    if(pod==='EJECUTIVO')   mP=!org.includes('SENADO')&&!org.includes('DIPUTADOS')&&!org.includes('JUDICIAL');
-    if(pod==='LEGISLATIVO') mP=org.includes('SENADO')||org.includes('DIPUTADOS')||org.includes('LEGISLAT');
-    if(pod==='JUDICIAL')    mP=org.includes('JUDICIAL')||org.includes('TRIBUNAL')||org.includes('MAGISTRATURA');
-    return mQ&&mN&&mP;
+    const mO=!org||(r.organismo||'')===(org);
+    return mQ&&mN&&mO;
   });
-  scPage=0; renderScoring();
+  poderes[nombre].page=0;
+  renderPoder(nombre);
 }
 
-function sortSc(col){
-  if(scSortCol===col) scSortAsc=!scSortAsc;
-  else { scSortCol=col; scSortAsc=false; }
-  scFiltered.sort((a,b)=>{
-    const keys=['funcionario_apellido_nombre','organismo','cargo','anio','total_bienes_inicio','total_bienes_final','ivpi','score_riesgo'];
-    const k=keys[col];
-    const av=a[k]; const bv=b[k];
-    if(typeof av==='number') return scSortAsc?av-bv:bv-av;
-    return scSortAsc?(av||'').localeCompare(bv||''):(bv||'').localeCompare(av||'');
-  });
-  renderScoring();
+function renderPoder(nombre){
+  const cfg=poderConfig[nombre];
+  const st=poderes[nombre];
+  const start=st.page*PAGE,page=st.filtered.slice(start,start+PAGE);
+  document.getElementById(cfg.countId).textContent=`${st.filtered.length.toLocaleString()} resultados`;
+  document.getElementById(cfg.pageId).textContent=`Pág ${st.page+1}/${Math.max(1,Math.ceil(st.filtered.length/PAGE))}`;
+  document.querySelector(`#${cfg.tableId} tbody`).innerHTML=page.map(r=>{
+    const delta=(r.total_bienes_final||0)-(r.total_bienes_inicio||0);
+    const deltaColor=delta>0?'var(--green)':delta<0?'var(--danger)':'var(--text)';
+    return`<tr onclick='openModal(${JSON.stringify(r).replace(/'/g,"&#39;")})' style="cursor:pointer">
+      <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,26)}</td>
+      <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,22)}</td>
+      <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,20)}</td>
+      <td title="${fmt(r.total_bienes_inicio)}">${fmtM(r.total_bienes_inicio)}</td>
+      <td title="${fmt(r.total_bienes_final)}">${fmtM(r.total_bienes_final)}</td>
+      <td style="color:${deltaColor}" title="${fmt(delta)}">${delta>=0?'+':''}${fmtM(delta)}</td>
+      <td title="${fmtU(delta/TC)}" style="color:${deltaColor}">${delta>=0?'+':''}${fmtU(delta/TC)}</td>
+      <td style="color:${r.ivpi>3?'var(--danger)':r.ivpi>1.5?'var(--warn)':'var(--text)'}">${fmt(r.ivpi,2)}</td>
+      <td>${bar(r.score_riesgo)}</td>
+      <td>${badge(r.nivel_riesgo)}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="10" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
 }
 
-function renderScoring(){
-  const start=scPage*PAGE;
-  const page=scFiltered.slice(start,start+PAGE);
-  document.getElementById('sc-count').textContent=`${scFiltered.length.toLocaleString()} resultados`;
-  document.getElementById('sc-page-info').textContent=`Pág ${scPage+1} / ${Math.max(1,Math.ceil(scFiltered.length/PAGE))}`;
-  document.querySelector('#scoring-table tbody').innerHTML=page.map(r=>`<tr>
-    <td title="${r.funcionario_apellido_nombre||''}">${(r.funcionario_apellido_nombre||'—').substring(0,30)}${poderTag(r.organismo)}</td>
+function poderPage(nombre,d){
+  const st=poderes[nombre];
+  st.page=Math.max(0,Math.min(Math.ceil(st.filtered.length/PAGE)-1,st.page+d));
+  renderPoder(nombre);
+}
+
+// ── JUDICIAL switches ─────────────────────────────────────────────────────
+function switchJudicial(tipo,btn){
+  document.querySelectorAll('#tab-judicial .btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('jud-oa-section').style.display=tipo==='oa'?'block':'none';
+  document.getElementById('jud-mag-section').style.display=tipo==='magistrados'?'block':'none';
+}
+
+async function loadMagistrados(){
+  const d=await api('/api/judicial');
+  if(!d||!d.datos)return;
+  magData=d.datos;
+  document.getElementById('jud-total-mag').textContent=fmt(d.total);
+  const provs=[...new Set(magData.map(r=>r.provincia).filter(Boolean))].sort();
+  const sel=document.getElementById('mag-prov');
+  sel.innerHTML='<option value="">Todas las provincias</option>'+provs.map(p=>`<option>${p}</option>`).join('');
+  filterMagistrados();
+}
+
+function filterMagistrados(){
+  const q=(document.getElementById('mag-search').value||'').toLowerCase();
+  const tipo=document.getElementById('mag-tipo').value;
+  const prov=document.getElementById('mag-prov').value;
+  magFiltered=magData.filter(r=>{
+    const mQ=!q||(r.nombre||'').toLowerCase().includes(q)||(r.organismo||'').toLowerCase().includes(q);
+    const mT=!tipo||(r.cargo||'').includes(tipo);
+    const mP=!prov||r.provincia===prov;
+    return mQ&&mT&&mP;
+  });
+  magPageNum=0;renderMagistrados();
+}
+
+function renderMagistrados(){
+  const start=magPageNum*PAGE,page=magFiltered.slice(start,start+PAGE);
+  document.getElementById('mag-count').textContent=`${magFiltered.length.toLocaleString()} magistrados`;
+  document.getElementById('mag-page-info').textContent=`Pág ${magPageNum+1}/${Math.max(1,Math.ceil(magFiltered.length/PAGE))}`;
+  document.querySelector('#mag-table tbody').innerHTML=page.map(r=>`<tr>
+    <td>${(r.nombre||'—').substring(0,30)}</td><td>${r.cargo||'—'}</td>
     <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
-    <td title="${r.cargo||''}">${(r.cargo||'—').substring(0,22)}</td>
-    <td>${r.anio||'—'}</td>
-    <td>${fmt(r.total_bienes_inicio)}</td>
-    <td>${fmt(r.total_bienes_final)}</td>
-    <td style="color:${r.ivpi>3?'var(--danger)':r.ivpi>1.5?'var(--warn)':'var(--text)'}">${fmt(r.ivpi,2)}</td>
-    <td>${bar(r.score_riesgo)}</td>
-    <td>${badge(r.nivel_riesgo)}</td>
-  </tr>`).join('')||'<tr><td colspan="9" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
+    <td title="${r.camara||''}">${(r.camara||'—').substring(0,22)}</td>
+    <td>${r.provincia||'—'}</td><td>${r.fecha_jura||'—'}</td>
+    <td><a href="${r.ddjj_consulta_url}" target="_blank" style="color:var(--accent);font-size:11px">Consultar →</a></td>
+  </tr>`).join('')||'<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
 }
 
-function scoringPage(d){ scPage=Math.max(0,Math.min(Math.ceil(scFiltered.length/PAGE)-1,scPage+d)); renderScoring(); }
+function magPageNav(d){magPageNum=Math.max(0,Math.min(Math.ceil(magFiltered.length/PAGE)-1,magPageNum+d));renderMagistrados();}
 
+// ── INDICADORES ──────────────────────────────────────────────────────────
+async function loadIndicadores(){
+  const d=await api('/api/indicadores/resumen');
+  if(!d){document.getElementById('marcos-grid').innerHTML='<div class="error-msg" style="grid-column:1/-1">Sin datos</div>';return;}
+  const marcos=[
+    {k:'score_fatf',n:'FATF/GAFI',c:'var(--accent)',desc:'Anti-lavado · PEP · Efectivo · Jurisdicciones'},
+    {k:'score_wb',n:'World Bank',c:'var(--teal)',desc:'Control Corrupción · Percentil LAC · Brecha salarial'},
+    {k:'score_ti',n:'Transparency Int.',c:'var(--green)',desc:'CPI Argentina 38/100 · Velocidad acumulación'},
+    {k:'score_ocde',n:'OCDE',c:'var(--mid)',desc:'Completitud · Conflicto · Puertas giratorias · Evolución'},
+  ];
+  const prom=d.promedio_por_marco||{};
+  document.getElementById('marcos-grid').innerHTML=marcos.map(m=>{
+    const v=prom[m.k]||0;
+    return`<div class="marco-item"><div class="marco-name" style="color:${m.c}">${m.n}</div>
+      <div class="marco-score">${fmt(v,1)}</div><div class="marco-desc">${m.desc}</div>
+      <div class="marco-bar"><div class="marco-bar-fill" style="width:${Math.min(100,v)}%;background:${m.c}"></div></div></div>`;
+  }).join('');
+  const distInt=d.distribucion||{};const totalInt=Object.values(distInt).reduce((a,b)=>a+b,0)||1;
+  const colors={'CRÍTICO':'var(--danger)','ALTO':'var(--warn)','MEDIO':'var(--mid)','BAJO':'var(--green)'};
+  document.getElementById('dist-int').innerHTML='<div class="dist-grid">'+['CRÍTICO','ALTO','MEDIO','BAJO'].map(k=>{
+    const v=distInt[k]||0;const pct=((v/totalInt)*100).toFixed(1);
+    return`<div class="dist-item"><div class="dist-label" style="color:${colors[k]}">${k}</div><div class="dist-count">${fmt(v)}</div><div class="dist-pct">${pct}%</div></div>`;
+  }).join('')+'</div>';
+  const ar=d.alertas_rojas_por_indicador||{};
+  const names={A1_pep:'A1 PEP Screening',A2_beneficial_ow:'A2 Beneficial Ownership',A3_cash_ratio:'A3 Cash Ratio >30%',A4_jurisdiccion:'A4 Jurisdicciones riesgo',B1_pares_lac:'B1 Percentil pares LAC',B2_brecha_sal:'B2 Brecha salarial >10×',C1_velocidad:'C1 Velocidad acumulación',C2_sector:'C2 Sector de riesgo TI',D1_completitud:'D1 Completitud declaratoria',D2_conflicto:'D2 Conflicto de interés',D3_puerta:'D3 Puerta giratoria 365d',D4_evolucion:'D4 Evolución patrimonial'};
+  const arE=Object.entries(ar).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('alertas-ind').innerHTML=arE.length?arE.map(([k,v])=>`<div class="indic-row"><span class="indic-code">${k.substring(0,2)}</span><span class="indic-name">${names[k]||k}</span><span style="font-family:var(--sans);font-weight:700;font-size:16px;color:var(--danger)">${fmt(v)}</span></div>`).join(''):'<div style="color:var(--muted);padding:20px;font-size:12px">Sin alertas rojas activas</div>';
+  const pesos={A1_pep:8,A2_beneficial_ow:7,A3_cash_ratio:8,A4_jurisdiccion:7,B1_pares_lac:10,B2_brecha_sal:10,C1_velocidad:10,C2_sector:5,D1_completitud:5,D2_conflicto:13,D3_puerta:10,D4_evolucion:7};
+  const descs={A1_pep:'PEP Screening (R.12)',A2_beneficial_ow:'Beneficial Ownership (R.24/25)',A3_cash_ratio:'Cash Ratio >30% patrimonio',A4_jurisdiccion:'Jurisdicciones lista gris/negra 2024',B1_pares_lac:'Percentil pares LAC (WGI 2024)',B2_brecha_sal:'Brecha salario >10× ingreso acumulado',C1_velocidad:'Velocidad acumulación (benchmark CPI=38)',C2_sector:'Sector de riesgo TI (obra/contratos)',D1_completitud:'Completitud declaratoria (Pilar 5)',D2_conflicto:'Conflicto de interés (Rec. 2017)',D3_puerta:'Puerta giratoria 365 días',D4_evolucion:'Evolución patrimonial 1.5×/año'};
+  const colores={A:'var(--accent)',B:'var(--teal)',C:'var(--green)',D:'var(--mid)'};
+  const grupos={fatf:['A1_pep','A2_beneficial_ow','A3_cash_ratio','A4_jurisdiccion'],wb:['B1_pares_lac','B2_brecha_sal'],ti:['C1_velocidad','C2_sector'],ocde:['D1_completitud','D2_conflicto','D3_puerta','D4_evolucion']};
+  Object.entries(grupos).forEach(([g,keys])=>{
+    const el=document.getElementById('ind-'+g);if(!el)return;
+    el.innerHTML=keys.map(k=>{const letra=k[0];const p=pesos[k]||0;
+      return`<div class="indic-row"><span class="indic-code" style="color:${colores[letra]}">${k.substring(0,2).toUpperCase()}</span><span class="indic-name">${descs[k]||k}</span>
+        <div style="flex:1;margin:0 8px"><div class="bar-bg" style="height:3px"><div class="bar-fill blue" style="width:${p*3}%;background:${colores[letra]}"></div></div></div>
+        <span class="indic-peso">${p}%</span></div>`;
+    }).join('');
+  });
+}
+
+// ── ALERTAS ───────────────────────────────────────────────────────────────
 async function loadAlertas(tipo,btn){
   document.querySelectorAll('#tab-alertas .btn').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
+  if(btn)btn.classList.add('active');
   const d=await api('/api/alertas?tipo='+tipo);
-  if(!d||!d.datos){
-    document.querySelector('#alertas-table tbody').innerHTML=`<tr><td colspan="6" class="error-msg">Sin datos para ${tipo}</td></tr>`;
-    return;
-  }
+  if(!d||!d.datos){document.querySelector('#alertas-table tbody').innerHTML='<tr><td colspan="6" class="error-msg">Sin datos</td></tr>';return;}
   alData=d.datos;
   document.getElementById('alertas-count').textContent=`${d.total.toLocaleString()} alertas`;
   const cols=alData.length?Object.keys(alData[0]).slice(0,7):[];
   document.getElementById('alertas-header').innerHTML=cols.map(c=>`<th>${c}</th>`).join('');
   filterAlertas();
 }
-
 function filterAlertas(){
   const q=(document.getElementById('al-search').value||'').toLowerCase();
   alFiltered=q?alData.filter(r=>JSON.stringify(r).toLowerCase().includes(q)):[...alData];
-  alPage=0; renderAlertas();
+  alPage=0;renderAlertas();
 }
-
 function renderAlertas(){
-  const start=alPage*PAGE;
-  const page=alFiltered.slice(start,start+PAGE);
+  const start=alPage*PAGE,page=alFiltered.slice(start,start+PAGE);
   const cols=alData.length?Object.keys(alData[0]).slice(0,7):[];
-  document.getElementById('al-page-info').textContent=`Pág ${alPage+1} / ${Math.max(1,Math.ceil(alFiltered.length/PAGE))}`;
+  document.getElementById('al-page-info').textContent=`Pág ${alPage+1}/${Math.max(1,Math.ceil(alFiltered.length/PAGE))}`;
   document.querySelector('#alertas-table tbody').innerHTML=page.map(r=>`<tr>${cols.map(c=>`<td title="${r[c]||''}">${String(r[c]||'—').substring(0,34)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
 }
+function alertasPage(d){alPage=Math.max(0,Math.min(Math.ceil(alFiltered.length/PAGE)-1,alPage+d));renderAlertas();}
 
-function alertasPage(d){ alPage=Math.max(0,Math.min(Math.ceil(alFiltered.length/PAGE)-1,alPage+d)); renderAlertas(); }
-
-async function loadJudicial(){
-  const d=await api('/api/judicial');
-  if(!d||!d.datos) return;
-  judData=d.datos;
-  const provs=[...new Set(judData.map(r=>r.provincia).filter(Boolean))].sort();
-  const sel=document.getElementById('jud-prov');
-  provs.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
-  filterJudicial();
-}
-
-function filterJudicial(){
-  const q=(document.getElementById('jud-search').value||'').toLowerCase();
-  const tipo=document.getElementById('jud-tipo').value;
-  const prov=document.getElementById('jud-prov').value;
-  judFiltered=judData.filter(r=>{
-    const mQ=!q||(r.nombre||'').toLowerCase().includes(q)||(r.organismo||'').toLowerCase().includes(q);
-    const mT=!tipo||(r.cargo||'').includes(tipo);
-    const mP=!prov||r.provincia===prov;
-    return mQ&&mT&&mP;
-  });
-  judPage=0; renderJudicial();
-}
-
-function renderJudicial(){
-  const start=judPage*PAGE;
-  const page=judFiltered.slice(start,start+PAGE);
-  document.getElementById('jud-count').textContent=`${judFiltered.length.toLocaleString()} magistrados`;
-  document.getElementById('jud-page-info').textContent=`Pág ${judPage+1} / ${Math.max(1,Math.ceil(judFiltered.length/PAGE))}`;
-  document.querySelector('#judicial-table tbody').innerHTML=page.map(r=>`<tr>
-    <td>${(r.nombre||'—').substring(0,30)}</td>
-    <td>${r.cargo||'—'}</td>
-    <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,26)}</td>
-    <td title="${r.camara||''}">${(r.camara||'—').substring(0,22)}</td>
-    <td>${r.provincia||'—'}</td>
-    <td>${r.fecha_jura||'—'}</td>
-    <td><a href="${r.ddjj_consulta_url}" target="_blank" style="color:var(--accent);font-size:11px">Consultar →</a></td>
-  </tr>`).join('')||'<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin resultados</td></tr>';
-}
-
-function judicialPage(d){ judPage=Math.max(0,Math.min(Math.ceil(judFiltered.length/PAGE)-1,judPage+d)); renderJudicial(); }
-
+// ── ANOMALÍAS ─────────────────────────────────────────────────────────────
 async function loadAnomalias(){
   const d=await api('/api/anomalias');
   document.getElementById('anom-kpis').innerHTML=`
-    <div class="anom-item">
-      <div class="anom-label">Total anomalías</div>
-      <div class="anom-val" style="color:var(--danger)">${d?fmt(d.total):'—'}</div>
-    </div>
-    <div class="anom-item">
-      <div class="anom-label">Isolation Forest</div>
-      <div class="anom-val" style="color:var(--warn)">3.319</div>
-    </div>
-    <div class="anom-item">
-      <div class="anom-label">One-Class SVM</div>
-      <div class="anom-val" style="color:var(--mid)">2.403</div>
-    </div>`;
-  if(!d||!d.datos||!d.datos.length){
-    document.querySelector('#anomalias-table tbody').innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin anomalías por consenso.</td></tr>';
-    return;
-  }
-  document.querySelector('#anomalias-table tbody').innerHTML=d.datos.slice(0,100).map(r=>`<tr>
+    <div class="kpi danger"><div class="kpi-label">Total anomalías</div><div class="kpi-value">${d?fmt(d.total):'—'}</div><div class="kpi-sub">Consenso IF ∩ SVM</div></div>
+    <div class="kpi warn"><div class="kpi-label">Isolation Forest</div><div class="kpi-value">3.319</div><div class="kpi-sub">Detectadas por IF</div></div>
+    <div class="kpi mid"><div class="kpi-label">One-Class SVM</div><div class="kpi-value">2.403</div><div class="kpi-sub">Detectadas por SVM</div></div>`;
+  if(!d||!d.datos||!d.datos.length){document.querySelector('#anomalias-table tbody').innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:20px">Sin anomalías por consenso.</td></tr>';return;}
+  document.querySelector('#anomalias-table tbody').innerHTML=d.datos.slice(0,100).map(r=>`<tr onclick='openModal(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
     <td>${(r.funcionario_apellido_nombre||r.nombre||'—').substring(0,28)}</td>
     <td title="${r.organismo||''}">${(r.organismo||'—').substring(0,24)}</td>
-    <td>${bar(r.score_riesgo)}</td>
-    <td style="color:var(--danger)">${fmt(r.if_score,3)}</td>
-    <td>${fmt(r.ivpi,2)}</td>
-    <td>${fmt(r.pn_actual)}</td>
-    <td>${badge(r.nivel_riesgo)}</td>
+    <td>${bar(r.score_riesgo)}</td><td style="color:var(--danger)">${fmt(r.if_score,3)}</td>
+    <td>${fmt(r.ivpi,2)}</td><td>${fmtM(r.pn_actual)}</td><td>${badge(r.nivel_riesgo)}</td>
   </tr>`).join('');
 }
 
+// ── MODAL FICHA ───────────────────────────────────────────────────────────
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch{}});charts={};}
+
+const chartDefaults={
+  color:'rgba(200,223,240,0.8)',
+  grid:{color:'rgba(30,58,86,0.8)'},
+  ticks:{color:'#4a7a9b'},
+};
+
+async function openModal(r){
+  destroyCharts();
+  const cuit=String(r.cuit||r.cuil||'').replace('.0','').trim();
+  document.getElementById('modal-nombre').textContent=r.funcionario_apellido_nombre||'—';
+  document.getElementById('modal-cargo').textContent=`${r.cargo||'—'} · ${r.organismo||'—'} · Año ${r.anio||2024}`;
+
+  const pnI=Number(r.total_bienes_inicio||0);
+  const pnF=Number(r.total_bienes_final||0);
+  const delta=pnF-pnI;
+  const ivpi=Number(r.ivpi||0);
+
+  document.getElementById('modal-kpis').innerHTML=`
+    <div class="kpi ${ivpi>3?'danger':ivpi>1.5?'warn':'green'}">
+      <div class="kpi-label">IVPI 2024</div>
+      <div class="kpi-value" style="font-size:28px">${fmt(ivpi,2)}×</div>
+      <div class="kpi-sub">Variación vs ingresos declarados</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-label">Δ Patrimonio 2024</div>
+      <div class="kpi-value" style="font-size:22px">${delta>=0?'+':''}${fmtM(delta)}</div>
+      <div class="kpi-sub">USD: ${delta>=0?'+':''}${fmtU(delta/TC)}</div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-label">Score riesgo</div>
+      <div class="kpi-value" style="font-size:28px">${fmt(r.score_riesgo)}</div>
+      <div class="kpi-sub">${badge(r.nivel_riesgo)}</div>
+    </div>`;
+
+  // Cargar histórico
+  let hist={};
+  if(cuit){
+    const hd=await api(`/api/historico/${cuit}`);
+    if(hd)hist=hd.evolucion||{};
+  }
+
+  // Siempre tener 2024
+  if(!hist['2024'])hist['2024']={pn_nominal:pnF,pn_usd:pnF/TC,ingresos:r.ingresos||r.total_ingreso_neto_c1234||0};
+
+  const anos=Object.keys(hist).sort();
+  const valNom=anos.map(a=>hist[a].pn_nominal);
+  const valUsd=anos.map(a=>hist[a].pn_usd);
+  const valIng=anos.map(a=>hist[a].ingresos);
+
+  setTimeout(()=>{
+    // Gráfico evolución — línea triple
+    const ctx=document.getElementById('chart-evolucion').getContext('2d');
+    charts.evol=new Chart(ctx,{
+      type:'line',
+      data:{
+        labels:anos,
+        datasets:[
+          {label:'PN Nominal ($)',data:valNom,borderColor:'var(--accent)',backgroundColor:'rgba(0,196,255,0.08)',borderWidth:2,pointRadius:5,pointHoverRadius:8,tension:0.3,yAxisID:'y'},
+          {label:'PN en USD',data:valUsd,borderColor:'var(--green)',backgroundColor:'rgba(0,230,118,0.06)',borderWidth:2,pointRadius:5,pointHoverRadius:8,tension:0.3,yAxisID:'y2'},
+          {label:'Ingresos declarados ($)',data:valIng,borderColor:'var(--warn)',backgroundColor:'rgba(255,170,0,0.06)',borderWidth:1.5,borderDash:[4,4],pointRadius:4,tension:0.3,yAxisID:'y'},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{position:'top',labels:{color:'#c8dff0',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.datasetIndex===1?fmtU(c.raw):fmtM(c.raw)}`}}
+        },
+        scales:{
+          x:{ticks:chartDefaults.ticks,grid:chartDefaults.grid},
+          y:{ticks:{...chartDefaults.ticks,callback:v=>fmtM(v)},grid:chartDefaults.grid,title:{display:true,text:'Pesos ($)',color:'#4a7a9b',font:{size:10}}},
+          y2:{position:'right',ticks:{...chartDefaults.ticks,callback:v=>fmtU(v)},grid:{display:false},title:{display:true,text:'USD',color:'#4a7a9b',font:{size:10}}},
+        }
+      }
+    });
+
+    // Ingresos doughnut
+    const ctxI=document.getElementById('chart-ingresos').getContext('2d');
+    const c1=Math.max(0,Number(r.ingreso_neto_renta_sueldo_c1||0));
+    const c2=Math.max(0,Number(r.ingreso_neto_renta_capitales_c2||0));
+    const c3=Math.max(0,Number(r.ingreso_neto_renta_empresa_c3||0));
+    const c4=Math.max(0,Number(r.ingreso_neto_renta_trabajo_personal_c4||0));
+    charts.ing=new Chart(ctxI,{
+      type:'doughnut',
+      data:{
+        labels:['Sueldo/Relación dep.','Renta capitales','Empresa/Sociedad','Trabajo personal'],
+        datasets:[{data:[c1,c2,c3,c4],backgroundColor:['rgba(0,196,255,0.7)','rgba(0,230,118,0.7)','rgba(124,77,255,0.7)','rgba(0,188,212,0.7)'],borderWidth:0}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{
+        legend:{position:'bottom',labels:{color:'#c8dff0',font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:c=>` ${fmtM(c.raw)} (${((c.raw/(c1+c2+c3+c4||1))*100).toFixed(1)}%)`}}
+      }}
+    });
+
+    // Radar marcos
+    const ctxR=document.getElementById('chart-radar').getContext('2d');
+    charts.radar=new Chart(ctxR,{
+      type:'radar',
+      data:{
+        labels:['FATF','World Bank','TI/CPI','OCDE','IVPI norm.','Score F3'],
+        datasets:[{label:'Riesgo',data:[r.score_fatf||0,r.score_wb||0,r.score_ti||0,r.score_ocde||0,Math.min(100,(ivpi/5)*100),r.score_riesgo||0],
+          backgroundColor:'rgba(0,196,255,0.1)',borderColor:'var(--accent)',pointBackgroundColor:'var(--accent)',borderWidth:1.5}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        scales:{r:{ticks:{color:'#4a7a9b',backdropColor:'transparent',stepSize:25},grid:{color:'#1e3a56'},pointLabels:{color:'#c8dff0',font:{size:10}}}},
+        plugins:{legend:{display:false}}
+      }
+    });
+  },80);
+
+  // Análisis
+  const ing=Number(r.ingresos||r.total_ingreso_neto_c1234||0);
+  const pctCrce=pnI>0?((pnF-pnI)/pnI*100).toFixed(1):null;
+  const justif=ing>0&&pnF<=pnI+(ing*4);
+  document.getElementById('modal-analisis').innerHTML=`
+    <div class="three-col">
+      <div class="card">
+        <div class="card-title">Crecimiento nominal</div>
+        <div style="font-family:var(--sans);font-size:26px;font-weight:800;color:${delta>=0?'var(--green)':'var(--danger)'}">${pctCrce!==null?pctCrce+'%':'—'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px">${fmtM(pnI)} → ${fmtM(pnF)}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Crecimiento en USD</div>
+        <div style="font-family:var(--sans);font-size:26px;font-weight:800;color:var(--teal)">${pctCrce!==null?pctCrce+'%':'—'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px">${fmtU(pnI/TC)} → ${fmtU(pnF/TC)} · TC $${TC}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Justificación OCDE</div>
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:${justif?'var(--green)':'var(--warn)'}">${justif?'JUSTIFICADO':'REQUIERE ANÁLISIS'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px">Δ vs ingresos × 4 años mandato</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);font-size:11px;line-height:1.9;color:var(--text)">
+      <strong style="color:var(--ink)">Análisis algorítmico automático:</strong><br>
+      PN Inicial: <strong>${fmtM(pnI)}</strong> · PN Final: <strong>${fmtM(pnF)}</strong> · Δ: <strong style="color:${delta>=0?'var(--green)':'var(--danger)'}">${delta>=0?'+':''}${fmtM(delta)}</strong> (${fmtU(delta/TC)})<br>
+      Ingresos declarados (cat. 1-4): <strong>${fmtM(ing)}</strong> · IVPI: <strong style="color:${ivpi>3?'var(--danger)':ivpi>1.5?'var(--warn)':'var(--green)'}">${fmt(ivpi,3)}×</strong><br>
+      ${ivpi>3?'⚠ Variación patrimonial muy superior a ingresos. Supera umbral FATF R.12 (PEP) y OCDE 1.5×/año.':ivpi>1.5?'⚡ Variación superior a ingresos declarados. Supera benchmark TI/CPI (1.2×/año para CPI&lt;40).':'✓ Variación patrimonial consistente con ingresos declarados.'}<br>
+      <span style="color:var(--muted);font-size:10px">Este análisis es algorítmico y no constituye imputación de responsabilidad.</span>
+    </div>`;
+
+  // Campos declarados
+  const camposRel=['dj_id','cuit','anio','tipo_declaracion_jurada_descripcion','organismo','cargo','desde','total_bienes_inicio','total_bienes_final','total_deudas_final','ingresos_neto_gastos','total_ingreso_neto_c1234','ingreso_neto_renta_sueldo_c1','ingreso_neto_renta_capitales_c2','ingreso_neto_renta_empresa_c3','ingreso_neto_renta_trabajo_personal_c4','diferencia_valuacion'];
+  const camposDisp=camposRel.filter(k=>r[k]!==undefined&&r[k]!==null&&r[k]!=='');
+  document.getElementById('modal-campos').innerHTML=`<table><thead><tr><th>Campo</th><th>Valor</th></tr></thead><tbody>`+
+    camposDisp.map(k=>{
+      const v=r[k];
+      const isNum=['total_bienes_inicio','total_bienes_final','total_deudas_final','ingresos_neto_gastos','total_ingreso_neto_c1234','ingreso_neto_renta_sueldo_c1','ingreso_neto_renta_capitales_c2','ingreso_neto_renta_empresa_c3','ingreso_neto_renta_trabajo_personal_c4','diferencia_valuacion'].includes(k);
+      const disp=isNum?`${fmtM(v)} <span style="color:var(--muted);font-size:10px">(${fmtU(Number(v)/TC)})</span>`:String(v);
+      return`<tr><td style="color:var(--muted);font-size:11px">${k}</td><td>${disp}</td></tr>`;
+    }).join('')+'</tbody></table>';
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-overlay').scrollTop=0;
+}
+
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');destroyCharts();}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
   loadResumen();
-  loadScoring();
+  loadPoder('ejecutivo');
+  loadPoder('legislativo');
+  loadPoder('judicial');
+  loadMagistrados();
+  loadIndicadores();
   loadAlertas('PUERTAS',document.getElementById('btn-puertas'));
-  loadJudicial();
   loadAnomalias();
 });
 </script>
