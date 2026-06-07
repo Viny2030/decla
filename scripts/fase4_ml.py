@@ -53,10 +53,16 @@ def preparar_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         return pd.DataFrame(), []
 
     X = df[feature_cols].copy()
+    X = X.apply(pd.to_numeric, errors="coerce")
+    X = X.dropna(axis=1, how="all")
+    if X.empty:
+        return pd.DataFrame(), []
+
+    feature_cols_validas = list(X.columns)
     X_imp    = SimpleImputer(strategy="median").fit_transform(X)
     X_scaled = StandardScaler().fit_transform(X_imp)
-    log.info(f"Features: {feature_cols}")
-    return pd.DataFrame(X_scaled, columns=feature_cols, index=df.index), feature_cols
+    log.info(f"Features: {feature_cols_validas}")
+    return pd.DataFrame(X_scaled, columns=feature_cols_validas, index=df.index), feature_cols_validas
 
 
 def isolation_forest(df: pd.DataFrame, X: pd.DataFrame) -> pd.DataFrame:
@@ -126,10 +132,10 @@ def detectar_clusters(G: nx.Graph) -> pd.DataFrame:
             if G.nodes[v].get("tipo") == "funcionario"
         ]
         clusters.append({
-            "cuit_sociedad":          cuit_soc,
+            "cuit_sociedad":           cuit_soc,
             "funcionarios_vinculados": "; ".join(funcionarios),
             "cantidad_funcionarios":   grado,
-            "criticidad":             "ROJA" if grado >= 3 else "AMARILLA",
+            "criticidad":              "ROJA" if grado >= 3 else "AMARILLA",
         })
     return pd.DataFrame(clusters)
 
@@ -142,7 +148,6 @@ def run_ml() -> dict:
     df_score = _cargar("scoring_riesgo.csv")
     ddjj     = _cargar("ddjj_normalizada.csv")
 
-    # Anomalías
     anomalias = pd.DataFrame()
     if not df_score.empty:
         X, _ = preparar_features(df_score)
@@ -154,7 +159,6 @@ def run_ml() -> dict:
             anomalias = df_score[mask].copy()
             anomalias.to_csv(PROC_DIR / "anomalias_ml.csv", index=False)
 
-    # Grafo
     clusters = pd.DataFrame()
     if not ddjj.empty:
         G = construir_grafo(ddjj)

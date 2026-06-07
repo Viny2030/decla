@@ -1,8 +1,8 @@
 """
-scripts/fase1_etl.py
-━━━━━━━━━━━━━━━━━━━━
+fase1_etl.py
+━━━━━━━━━━━━
 Fase 1 — Ingestión y Normalización de DDJJ
-Fuentes: Portal de Datos Abiertos OA (datos.gob.ar) + BCRA (deflactación)
+Fuentes: datos.jus.gob.ar (OA - Ministerio de Justicia) + BCRA v2.0
 
 Salidas:
   data/processed/ddjj_normalizada.csv
@@ -13,7 +13,6 @@ Salidas:
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -27,13 +26,25 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 PROC_DIR.mkdir(parents=True, exist_ok=True)
 
 ENDPOINTS = {
-    "sujetos_obligados": "https://infra.datos.gob.ar/catalog/jgm/dataset/32/distribution/32.1/download/sujetos-obligados.csv",
-    "ddjj_anuales":      "https://infra.datos.gob.ar/catalog/jgm/dataset/32/distribution/32.2/download/declaraciones-juradas-anuales.csv",
-    "altas_bajas":       "https://infra.datos.gob.ar/catalog/jgm/dataset/32/distribution/32.3/download/altas-bajas.csv",
+    "ddjj_anuales": (
+        "https://datos.jus.gob.ar/dataset/4680199f-6234-4262-8a2a-8f7993bf784d"
+        "/resource/a331ccb8-5c13-447f-9bd6-d8018a4b8a62"
+        "/download/declaraciones-juradas-2024-consolidado-al-20251222.csv"
+    ),
+    "ddjj_bienes": (
+        "https://datos.jus.gob.ar/dataset/4680199f-6234-4262-8a2a-8f7993bf784d"
+        "/resource/ffa28585-9adb-473e-9627-0ffe1938d288"
+        "/download/declaraciones-juradas-bienes-2024-consolidado-al-20251222.csv"
+    ),
+    "ddjj_deudas": (
+        "https://datos.jus.gob.ar/dataset/4680199f-6234-4262-8a2a-8f7993bf784d"
+        "/resource/dd1c30e2-e773-47fd-ac80-9afaf3f1baa4"
+        "/download/declaraciones-juradas-deudas-2024-consolidado-al-20251222.csv"
+    ),
 }
 
-BCRA_API = "https://api.bcra.gob.ar/estadisticas/v1/datosvariable/4/2023-01-01/2024-12-31"
-TC_FIJO  = 900.0   # fallback si BCRA no responde
+BCRA_API = "https://api.bcra.gob.ar/estadisticas/v2.0/datosvariable/4/2023-01-01/2024-12-31"
+TC_FIJO  = 900.0
 
 
 def descargar_fuentes() -> dict[str, pd.DataFrame]:
@@ -68,6 +79,7 @@ def obtener_tipo_cambio() -> float:
             pass
     try:
         r = requests.get(BCRA_API, timeout=30)
+        r.raise_for_status()
         data = r.json().get("results", [])
         if data:
             df_tc = pd.DataFrame(data)[["fecha", "valor"]]
@@ -92,7 +104,6 @@ def normalizar_cuil(valor) -> str | None:
 def limpiar_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
-    # normalizar columnas
     df.columns = (
         df.columns.str.lower().str.strip()
         .str.replace(r"\s+", "_", regex=True)
@@ -103,12 +114,10 @@ def limpiar_df(df: pd.DataFrame) -> pd.DataFrame:
         .str.replace(r"[úùü]", "u", regex=True)
         .str.replace("ñ", "n", regex=True)
     )
-    # CUIL/CUIT
     for col in [c for c in df.columns if "cuil" in c or "cuit" in c]:
         df[col] = df[col].apply(normalizar_cuil)
-    # fechas
     for col in [c for c in df.columns if "fecha" in c or "periodo" in c]:
-        df[col] = pd.to_datetime(df[col], errors="coerce")
+        df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
     antes = len(df)
     df.drop_duplicates(inplace=True)
     if antes - len(df) > 0:
@@ -130,26 +139,64 @@ def deflactar(df: pd.DataFrame, tc: float) -> pd.DataFrame:
     return df
 
 
+def extraer_sujetos(ddjj: pd.DataFrame) -> pd.DataFrame:
+    cols = [c for c in ddjj.columns if any(
+        k in c for k in ["nombre", "apellido", "cuil", "cuit", "cargo",
+                          "organismo", "jurisdiccion", "poder", "funcion"]
+    )]
+    if not cols:
+        return pd.DataFrame()
+    return ddjj[cols].drop_duplicates().reset_index(drop=True)
+
+
+def extraer_altas_bajas(ddjj: pd.DataFrame) -> pd.DataFrame:
+    cols_mov = [c for c in ddjj.columns if any(
+        k in c for k in ["alta", "baja", "inicio", "fin", "desde", "hasta",
+                          "ingreso", "egreso"]
+    )]
+    cols_id = [c for c in ddjj.columns if "cuil" in c or "cuit" in c]
+    cols = list(dict.fromkeys(cols_id + cols_mov))
+    if not cols_mov:
+        return pd.DataFrame()
+    return ddjj[cols].dropna(how="all").drop_duplicates().reset_index(drop=True)
+
+
 def run_etl() -> pd.DataFrame:
     log.info("=" * 55)
     log.info("FASE 1 — ETL")
     log.info("=" * 55)
+
     dfs = descargar_fuentes()
     tc  = obtener_tipo_cambio()
 
-    sujetos = limpiar_df(dfs.get("sujetos_obligados", pd.DataFrame()))
-    ddjj    = limpiar_df(dfs.get("ddjj_anuales",      pd.DataFrame()))
-    cambios = limpiar_df(dfs.get("altas_bajas",        pd.DataFrame()))
+    ddjj   = limpiar_df(dfs.get("ddjj_anuales", pd.DataFrame()))
+    bienes = limpiar_df(dfs.get("ddjj_bienes",  pd.DataFrame()))
+    deudas = limpiar_df(dfs.get("ddjj_deudas",  pd.DataFrame()))
 
     if not ddjj.empty:
         ddjj = deflactar(ddjj, tc)
 
-    if not sujetos.empty:
-        sujetos.to_csv(PROC_DIR / "sujetos_obligados_clean.csv", index=False)
-    if not ddjj.empty:
+        sujetos = extraer_sujetos(ddjj)
+        cambios = extraer_altas_bajas(ddjj)
+
         ddjj.to_csv(PROC_DIR / "ddjj_normalizada.csv", index=False)
-    if not cambios.empty:
-        cambios.to_csv(PROC_DIR / "altas_bajas_clean.csv", index=False)
+        log.info(f"  ✓ ddjj_normalizada.csv — {len(ddjj)} registros")
+
+        if not sujetos.empty:
+            sujetos.to_csv(PROC_DIR / "sujetos_obligados_clean.csv", index=False)
+            log.info(f"  ✓ sujetos_obligados_clean.csv — {len(sujetos)} registros")
+
+        if not cambios.empty:
+            cambios.to_csv(PROC_DIR / "altas_bajas_clean.csv", index=False)
+            log.info(f"  ✓ altas_bajas_clean.csv — {len(cambios)} registros")
+
+    if not bienes.empty:
+        bienes.to_csv(PROC_DIR / "ddjj_bienes.csv", index=False)
+        log.info(f"  ✓ ddjj_bienes.csv — {len(bienes)} registros")
+
+    if not deudas.empty:
+        deudas.to_csv(PROC_DIR / "ddjj_deudas.csv", index=False)
+        log.info(f"  ✓ ddjj_deudas.csv — {len(deudas)} registros")
 
     log.info(f"Fase 1 OK — DDJJ normalizadas: {len(ddjj)}")
     return ddjj
