@@ -45,15 +45,24 @@ def _col(df: pd.DataFrame, candidatos: list[str]) -> str | None:
     return None
 
 
-def _mask_poder(org: pd.Series, poder: str) -> pd.Series:
-    u = org.str.upper().fillna("")
+def _mask_poder(df: pd.DataFrame, poder: str) -> pd.Series:
+    """
+    Usa el campo 'poder' generado por enriquecer_poder() en fase1.
+    Fallback a keywords en organismo si el campo no existe.
+    """
+    # Usar campo 'poder' si existe (generado por fase1_etl.py)
+    if "poder" in df.columns:
+        return df["poder"].str.upper().fillna("EJECUTIVO") == poder.upper()
+
+    # Fallback legacy por organismo
+    org = df.get("organismo", pd.Series(dtype=str)).str.upper().fillna("")
     if poder == "EJECUTIVO":
-        return ~u.str.contains("SENADO|DIPUTADOS|LEGISLAT|CONGRESO|JUDICIAL|TRIBUNAL|MAGISTRATURA|DEFENSOR|FISCAL")
+        return ~org.str.contains("SENADO|DIPUTADOS|LEGISLAT|CONGRESO|JUDICIAL|TRIBUNAL|MAGISTRATURA|DEFENSOR|FISCAL")
     if poder == "LEGISLATIVO":
-        return u.str.contains("SENADO|DIPUTADOS|LEGISLAT|CONGRESO")
+        return org.str.contains("SENADO|DIPUTADOS|LEGISLAT|CONGRESO")
     if poder == "JUDICIAL":
-        return u.str.contains("JUDICIAL|TRIBUNAL|MAGISTRATURA|DEFENSOR|FISCAL")
-    return pd.Series(True, index=org.index)
+        return org.str.contains("JUDICIAL|TRIBUNAL|MAGISTRATURA|DEFENSOR|FISCAL")
+    return pd.Series(True, index=df.index)
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────
@@ -91,11 +100,11 @@ def resumen():
     }
 
 
-# ── Scoring Fase 3 ────────────────────────────────────────────────────────
+# ── Scoring Fase 3 — TODOS los registros ─────────────────────────────────
 
 @app.get("/api/scoring")
 def scoring(
-    limite:    int           = Query(50, ge=1, le=500),
+    limite:    int           = Query(70000, ge=1, le=70000),
     nivel:     Optional[str] = Query(None),
     organismo: Optional[str] = Query(None),
 ):
@@ -115,7 +124,7 @@ def scoring(
 @app.get("/api/poder/{poder}")
 def por_poder(
     poder: str,
-    limite:    int           = Query(300, ge=1, le=1000),
+    limite:    int           = Query(70000, ge=1, le=70000),
     organismo: Optional[str] = Query(None),
     nivel:     Optional[str] = Query(None),
     buscar:    Optional[str] = Query(None),
@@ -128,7 +137,7 @@ def por_poder(
     if p not in ("EJECUTIVO", "LEGISLATIVO", "JUDICIAL"):
         raise HTTPException(400, "Poder inválido. Usar: EJECUTIVO, LEGISLATIVO, JUDICIAL")
 
-    df = df[_mask_poder(df["organismo"], p)]
+    df = df[_mask_poder(df, p)]
 
     if organismo:
         df = df[df["organismo"].str.contains(organismo, case=False, na=False)]
@@ -143,7 +152,6 @@ def por_poder(
 
     df = df.sort_values("score_riesgo", ascending=False).head(limite)
 
-    # Organismos únicos para filtro
     organismos = sorted(df["organismo"].dropna().unique().tolist()) if "organismo" in df.columns else []
 
     return {
@@ -173,13 +181,18 @@ def historico_funcionario(cuit: str):
         cuil_col = _col(df, ["cuit", "cuil", "cuil_declarante"])
         if not cuil_col:
             continue
-        # normalizar CUIT para comparar
-        serie = df[cuil_col].astype(str).str.replace("-","").str.replace(".0","").str.strip()
+        # Normalizar CUIT: manejar notación científica (2.017256e+10), guiones, .0
+        def norm_cuit(v):
+            s = str(v).strip().replace("-", "")
+            if 'e+' in s.lower() or 'e-' in s.lower():
+                try: s = str(int(float(s)))
+                except: return ""
+            return s.replace(".0", "").strip()
+        serie = df[cuil_col].apply(norm_cuit)
         mask = serie == cuit_limpio
         filas = df[mask]
         if filas.empty:
             continue
-        # Preferir declaración anual (tipo 1) sobre inicial (tipo 0)
         if "tipo_declaracion_jurada_id" in filas.columns:
             anuales = filas[filas["tipo_declaracion_jurada_id"].astype(str).isin(["1","1.0"])]
             fila = anuales.iloc[0] if not anuales.empty else filas.iloc[0]
@@ -190,16 +203,56 @@ def historico_funcionario(cuit: str):
     if not resultado:
         raise HTTPException(404, f"CUIT {cuit} no encontrado en ningún año.")
 
-    # Calcular evolución
     evolucion = {}
-    TC = 900.0
+    TC_POR_AÑO = {"2022": 177.16, "2023": 808.45, "2024": 1045.0}
+
+    def parsear_oa(v):
+        """Parsea formato OA: '11851166833-39' → 11851166833.39"""
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        s = str(v).strip()
+        if not s or s in ('---', '--', '-', 'None', 'nan'):
+            return None
+        try:
+            # Ya es número
+            return float(s)
+        except ValueError:
+            pass
+        # Formato OA: dígitos-dígitos
+        if '-' in s:
+            partes = s.rsplit('-', 1)
+            entero = partes[0].replace('-','').replace(',','')
+            decimal = partes[1] if len(partes) > 1 else '0'
+            try:
+                return float(f"{entero}.{decimal}")
+            except ValueError:
+                return None
+        return None
+
+    import pandas as pd
     for anio, row in resultado.items():
-        pn = row.get("total_bienes_final") or row.get("pn_actual")
-        ing = row.get("total_ingreso_neto_c1234") or row.get("ingresos_neto_gastos") or row.get("ingresos")
+        tc = TC_POR_AÑO.get(str(anio), 1045.0)
+
+        # Intentar columna ya deflactada primero
+        pn_usd = row.get("total_bienes_final_usd") or row.get("pn_actual")
+
+        # Si no, parsear desde ARS
+        if not pn_usd:
+            pn_ars = parsear_oa(row.get("total_bienes_final") or row.get("total_bienes_inicio"))
+            pn_usd = round(pn_ars / tc, 2) if pn_ars else None
+
+        ing_ars = parsear_oa(
+            row.get("total_ingreso_neto_c1234") or
+            row.get("ingresos_neto_gastos") or
+            row.get("ingresos_trabajos_alquileres_rentas") or
+            row.get("ingresos")
+        )
+        ing_usd = round(ing_ars / tc, 2) if ing_ars else None
+
         evolucion[anio] = {
-            "pn_nominal": pn,
-            "pn_usd":     round(pn / TC, 2) if pn else None,
-            "ingresos":   ing,
+            "pn_usd":    pn_usd,
+            "ing_usd":   ing_usd,
+            "tc_usado":  tc,
         }
 
     return {
@@ -233,11 +286,12 @@ def perfil_funcionario(cuil: str):
     if sc.empty:
         raise HTTPException(404, "Sin datos")
 
-    cuil_col = _col(sc, ["cuil", "cuil_declarante"])
+    cuil_col = _col(sc, ["cuit", "cuil", "cuil_declarante"])
     if not cuil_col:
-        raise HTTPException(404, "Sin columna CUIL")
+        raise HTTPException(404, "Sin columna CUIL/CUIT")
 
-    mask = sc[cuil_col].astype(str).str.replace("-","") == cuil.replace("-","")
+    cuil_limpio = cuil.replace("-", "").replace(".0", "").strip()
+    mask = sc[cuil_col].astype(str).str.replace("-", "").str.replace(".0", "").str.strip() == cuil_limpio
     if not mask.any():
         raise HTTPException(404, f"Funcionario {cuil} no encontrado")
 
@@ -259,10 +313,10 @@ def perfil_funcionario(cuil: str):
 
 @app.get("/api/judicial")
 def judicial(
-    limite:   int           = Query(1000, ge=1, le=2000),
+    limite:    int           = Query(2000, ge=1, le=5000),
     provincia: Optional[str] = Query(None),
-    cargo:    Optional[str] = Query(None),
-    buscar:   Optional[str] = Query(None),
+    cargo:     Optional[str] = Query(None),
+    buscar:    Optional[str] = Query(None),
 ):
     df = _csv("tabla_judicial.csv")
     if df.empty:
@@ -344,11 +398,12 @@ def indicadores_funcionario(cuil: str):
     if df.empty:
         raise HTTPException(404, "Sin datos de indicadores")
 
-    cuil_col = _col(df, ["cuil", "cuil_declarante"])
+    cuil_col = _col(df, ["cuit", "cuil", "cuil_declarante"])
     if not cuil_col:
-        raise HTTPException(404, "Sin columna CUIL")
+        raise HTTPException(404, "Sin columna CUIL/CUIT")
 
-    mask = df[cuil_col].astype(str).str.replace("-","") == cuil.replace("-","")
+    cuil_limpio = cuil.replace("-", "").replace(".0", "").strip()
+    mask = df[cuil_col].astype(str).str.replace("-", "").str.replace(".0", "").str.strip() == cuil_limpio
     if not mask.any():
         raise HTTPException(404, f"Funcionario {cuil} no encontrado")
 

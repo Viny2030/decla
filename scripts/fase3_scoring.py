@@ -40,11 +40,14 @@ def _cargar(nombre: str) -> pd.DataFrame:
 
 
 def calcular_ivpi(df: pd.DataFrame) -> pd.DataFrame:
-    # Columnas del nuevo dataset datos.jus.gob.ar
-    c_act  = _col(df, ["total_bienes_final", "patrimonio_neto_usd", "patrimonio_neto"])
-    c_ant  = _col(df, ["total_bienes_inicio", "patrimonio_neto_anterior_usd", "patrimonio_neto_anterior"])
-    c_ingr = _col(df, ["total_ingreso_neto_c1234", "ingresos_neto_gastos",
-                        "ingresos_declarados", "ingresos_anuales", "ingresos_usd"])
+    # Columnas reales del CSV OA — ya parseadas y deflactadas por fase1
+    c_act  = _col(df, ["total_bienes_final_usd",  "total_bienes_final",
+                        "patrimonio_neto_usd",      "patrimonio_neto"])
+    c_ant  = _col(df, ["total_bienes_inicio_usd",  "total_bienes_inicio",
+                        "patrimonio_neto_anterior_usd", "patrimonio_neto_anterior"])
+    c_ingr = _col(df, ["total_ingreso_neto_c1234_usd", "total_ingreso_neto_c1234",
+                        "ingresos_neto_gastos_usd",     "ingresos_neto_gastos",
+                        "ingresos_declarados",          "ingresos_usd"])
 
     if not all([c_act, c_ant, c_ingr]):
         log.warning("Sin columnas para IVPI — marcando SIN_DATOS")
@@ -52,11 +55,27 @@ def calcular_ivpi(df: pd.DataFrame) -> pd.DataFrame:
         df["ivpi_bandera"] = "SIN_DATOS"
         return df
 
-    df["pn_actual"] = pd.to_numeric(df[c_act],  errors="coerce")
+    # Deflactar filas sin _usd usando tc_conversion_usd
+    tc = pd.to_numeric(df.get("tc_conversion_usd", pd.Series(1045.0, index=df.index)), errors="coerce").fillna(1045.0)
+    def _to_usd(col_usd, col_ars):
+        usd = pd.to_numeric(df[col_usd], errors="coerce") if col_usd and col_usd in df.columns else pd.Series(np.nan, index=df.index)
+        ars = pd.to_numeric(df[col_ars],  errors="coerce") if col_ars  and col_ars  in df.columns else pd.Series(np.nan, index=df.index)
+        # Combinar: preferir USD si válido, sino ARS/TC
+        combined = usd.where(usd.notna(), ars / tc)
+        return combined
+
+    c_act_ars = _col(df, ["total_bienes_final",   "patrimonio_neto"])
+    c_ant_ars = _col(df, ["total_bienes_inicio"])
+    c_ingr_ars= _col(df, ["total_ingreso_neto_c1234", "ingresos_neto_gastos"])
+
+    df["pn_actual"] = _to_usd(c_act,  c_act_ars)
     df["pn_ant"]    = pd.to_numeric(df[c_ant],   errors="coerce")
-    df["ingresos"]  = pd.to_numeric(df[c_ingr],  errors="coerce")
+    df["pn_ant"]    = _to_usd(c_ant,  c_ant_ars)
+    df["ingresos"]  = _to_usd(c_ingr, c_ingr_ars)
     df["delta_pn"]  = df["pn_actual"] - df["pn_ant"]
-    df["ivpi"]      = (df["delta_pn"] / df["ingresos"].replace(0, np.nan)).round(3)
+    # Ingresos < 100 USD son datos inválidos/incompletos — excluir del IVPI
+    ingresos_validos = df["ingresos"].where(df["ingresos"] >= 100.0)
+    df["ivpi"]      = (df["delta_pn"] / ingresos_validos.replace(0, np.nan)).round(3)
 
     df["ivpi_bandera"] = df["ivpi"].apply(
         lambda v: "ROJA"    if pd.notna(v) and v > UMBRAL_IVPI_ROJO
@@ -143,7 +162,7 @@ def run_scoring() -> pd.DataFrame:
 
     cols = [c for c in [
         "cuit", "funcionario_apellido_nombre", "organismo", "cargo",
-        "sector", "anio", "desde",
+        "poder", "sector", "anio", "desde",
         "total_bienes_inicio", "total_bienes_final", "total_ingreso_neto_c1234",
         "ingresos_neto_gastos",
         "pn_actual", "pn_ant", "ingresos", "delta_pn",
