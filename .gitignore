@@ -26,3 +26,10 @@ data/raw/tipo_cambio.csv
 # Certificados ARCA
 MonitorXAI_*.crt
 privada.key
+
+diag*.py
+patch*.py
+test*.py
+fix_*.py
+find_*.py
+tra_test.*
