@@ -1,0 +1,55 @@
+name: Monitor DDJJ — Constancias ARCA
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 07:00 UTC / 04:00 Argentina (después del pipeline principal)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  constancias:
+    runs-on: ubuntu-latest
+
+    env:
+      ARCA_CERT: ${{ secrets.ARCA_CERT }}
+      ARCA_KEY:  ${{ secrets.ARCA_KEY }}
+      ARCA_PROD: ${{ secrets.ARCA_PROD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Instalar OpenSSL (para firma WSAA)
+        run: sudo apt-get install -y openssl
+
+      - name: Crear directorios
+        run: mkdir -p data/raw data/processed
+
+      - name: Consultar constancias ARCA
+        run: python scripts/arca/run_constancias.py
+
+      - name: Commit resultados
+        run: |
+          git config --global user.name  'Robot Monitor DDJJ'
+          git config --global user.email 'robot-ddjj@noreply.github.com'
+          git pull --rebase origin main
+          git add data/processed/constancias_arca.csv || true
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "ARCA constancias $(date +'%Y-%m-%d') — inscripcion actualizada"
+            git push origin main
+          else
+            echo "Sin cambios."
+          fi
