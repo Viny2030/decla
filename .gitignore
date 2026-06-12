@@ -16,3 +16,9 @@ data/processed/
 
 # Tipo de cambio cache
 data/raw/tipo_cambio.csv
+
+# Certificados y claves ARCA — nunca subir al repo
+*.key
+*.pem
+*.crt
+*.p12
