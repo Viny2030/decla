@@ -22,3 +22,7 @@ data/raw/tipo_cambio.csv
 *.pem
 *.crt
 *.p12
+
+# Certificados ARCA
+MonitorXAI_*.crt
+privada.key
