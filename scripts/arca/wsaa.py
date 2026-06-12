@@ -72,51 +72,34 @@ def _build_tra(service: str) -> bytes:
 
 # ── Firma ──────────────────────────────────────────────────────────────────────
 def _sign_tra(tra_bytes: bytes, cert_path: str, key_path: str) -> str:
-    """Firma el TRA usando oscrypto con SHA1. Devuelve base64 del CMS."""
-    from oscrypto import asymmetric
-    from oscrypto.keys import parse_certificate, parse_private
-    from asn1crypto import cms, core, algos, x509, pem as asn1pem
-    import hashlib
+    """Firma el TRA con openssl cms (DER). Devuelve base64."""
+    tmp_dir = tempfile.gettempdir()
 
-    cert_pem = Path(cert_path).read_bytes()
-    key_pem  = Path(key_path).read_bytes()
+    with tempfile.NamedTemporaryFile(suffix=".xml", delete=False, dir=tmp_dir) as f:
+        f.write(tra_bytes)
+        tra_path = f.name
 
-    cert_obj  = asymmetric.load_certificate(cert_pem)
-    key_obj   = asymmetric.load_private_key(key_pem)
-    signature = asymmetric.rsa_pkcs1v15_sign(key_obj, tra_bytes, "sha1")
+    with tempfile.NamedTemporaryFile(suffix=".der", delete=False, dir=tmp_dir) as f:
+        cms_path = f.name
 
-    # Construir CMS SignedData manualmente con asn1crypto
-    digest    = hashlib.sha1(tra_bytes).digest()
+    result = subprocess.run([
+        "openssl", "cms", "-sign",
+        "-in",      tra_path,
+        "-out",     cms_path,
+        "-signer",  cert_path,
+        "-inkey",   key_path,
+        "-nodetach",
+        "-outform", "DER",
+        "-md",      "sha256",
+    ], capture_output=True)
 
-    signed_data = cms.SignedData({
-        'version': 'v1',
-        'digest_algorithms': [{'algorithm': 'sha1'}],
-        'encap_content_info': {
-            'content_type': 'data',
-            'content': tra_bytes,
-        },
-        'certificates': [cert_obj.asn1],
-        'signer_infos': [{
-            'version': 'v1',
-            'sid': cms.SignerIdentifier(
-                name='issuer_and_serial_number',
-                value={
-                    'issuer': cert_obj.asn1['tbs_certificate']['issuer'],
-                    'serial_number': cert_obj.asn1['tbs_certificate']['serial_number'],
-                }
-            ),
-            'digest_algorithm': {'algorithm': 'sha1'},
-            'signature_algorithm': {'algorithm': 'rsassa_pkcs1v15'},
-            'signature': signature,
-        }],
-    })
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"openssl cms falló:\n{result.stderr.decode('utf-8', errors='replace')}"
+        )
 
-    content_info = cms.ContentInfo({
-        'content_type': 'signed_data',
-        'content': signed_data,
-    })
-
-    return base64.b64encode(content_info.dump()).decode()
+    der = Path(cms_path).read_bytes()
+    return base64.b64encode(der).decode()
 
 
 # ── WSAA ───────────────────────────────────────────────────────────────────────
