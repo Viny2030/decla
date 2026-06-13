@@ -60,7 +60,13 @@ jobs:
           git config --global user.name  'Robot Monitor DDJJ'
           git config --global user.email 'robot-ddjj@noreply.github.com'
           git pull --rebase origin main
-          git add data/processed/ || true
+          git add -f data/processed/sujetos_obligados_clean.csv || true
+          git add -f data/processed/scoring_riesgo.csv || true
+          git add -f data/processed/anomalias_ml.csv || true
+          git add -f data/processed/perfil_riesgo_completo.csv || true
+          git add -f data/processed/indicadores_internacionales.csv || true
+          git add -f data/processed/alertas_puertas_giratorias.csv || true
+          git add -f data/processed/tabla_judicial.csv || true
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Monitor DDJJ $(date +'%Y-%m-%d') — pipeline completo"
             git push origin main
