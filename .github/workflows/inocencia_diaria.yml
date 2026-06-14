@@ -45,11 +45,14 @@ jobs:
         run: |
           git config --global user.name  'Robot Monitor DDJJ'
           git config --global user.email 'robot-ddjj@noreply.github.com'
-          git pull --rebase origin main
+
           git add data/processed/constancias_arca.csv || true
+
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "ARCA constancias $(date +'%Y-%m-%d') — inscripcion actualizada"
+            git pull --rebase origin main
             git push origin main
           else
+            git pull --rebase origin main || true
             echo "Sin cambios."
           fi
