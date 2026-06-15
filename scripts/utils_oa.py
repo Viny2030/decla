@@ -13,6 +13,7 @@ Usado por:
 
 import re
 
+import numpy as np
 import pandas as pd
 
 # Match: dígitos (con posibles separadores , o .) + guión + dígitos al final
@@ -58,6 +59,9 @@ def parsear_oa_serie(serie: pd.Series) -> pd.Series:
     - Valores ya numéricos (o numéricos como string, ej. "1234.56") quedan igual.
     - Valores en formato OA ("11401021-93") se convierten a 11401021.93.
     - Placeholders ('---', '', 'nan', etc.) y valores no parseables quedan en NaN.
+    - "-0.00" (cero NEGATIVO) es el placeholder de OA para "no informado" —
+      se convierte a NaN. "0.00" (cero positivo) se mantiene como 0 (puede
+      ser una declaración real de patrimonio nulo).
 
     No modifica la Serie original — devuelve una nueva Serie numérica (float).
     """
@@ -73,5 +77,9 @@ def parsear_oa_serie(serie: pd.Series) -> pd.Series:
         entero  = partes[0].str.replace('-', '', regex=False).str.replace(',', '', regex=False)
         decimal = partes[1]
         numerico.loc[mask_oa] = pd.to_numeric(entero + '.' + decimal, errors="coerce")
+
+    # "-0.00" (cero negativo) = placeholder OA "no informado" -> NaN
+    neg_zero = (numerico == 0) & np.signbit(numerico.to_numpy(dtype="float64"))
+    numerico = numerico.mask(neg_zero)
 
     return numerico
