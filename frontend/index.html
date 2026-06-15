@@ -1105,6 +1105,34 @@ function renderKPIs(poder) {
   const d = DATA[poder];
   if (!d.length) return;
 
+  const idMap = { eje: 'kpis-eje', leg: 'kpis-leg', jud: 'kpis-jud' };
+
+  // Poder Judicial: las DDJJ patrimoniales no son públicas (Ley 27.275, art. 16 /
+  // Consejo de la Magistratura). No mostramos score/patrimonio en 0 porque sería
+  // engañoso -- en cambio, explicamos por qué no hay datos.
+  if (poder === 'jud') {
+    const total = d.length;
+    const url = d.find(r => r.ddjj_consulta_url)?.ddjj_consulta_url || '#';
+    document.getElementById(idMap.jud).innerHTML = `
+      <div class="kpi">
+        <div class="kpi-val">${total}</div>
+        <div class="kpi-lbl">Magistrados/as registrados</div>
+      </div>
+      <div class="kpi" style="flex:3; text-align:left;">
+        <div class="kpi-lbl" style="font-size:.8rem; line-height:1.5; color:#9aa6c0;">
+          ⚠️ Las declaraciones juradas patrimoniales del Poder Judicial
+          <strong style="color:#fff;">no son de acceso público</strong> vía
+          OA/datos.gob.ar. Score, patrimonio y nivel de riesgo no están
+          disponibles para este poder.
+          <a href="${url}" target="_blank" rel="noopener" style="color:#7aaeff;">
+            Consultar en el Consejo de la Magistratura →
+          </a>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const total      = d.length;
   const criticos   = d.filter(r => r.nivel_riesgo === 'CRÍTICO').length;
   const altos      = d.filter(r => r.nivel_riesgo === 'ALTO').length;
@@ -1143,7 +1171,6 @@ function renderKPIs(poder) {
     </div>
   `;
 
-  const idMap = { eje: 'kpis-eje', leg: 'kpis-leg', jud: 'kpis-jud' };
   document.getElementById(idMap[poder]).innerHTML = html;
 }
 
@@ -1287,6 +1314,29 @@ function renderTabla(poder) {
     return;
   }
 
+  // Poder Judicial: tabla_judicial.csv solo tiene datos de nómina
+  // (nombre, cargo, cámara, provincia) -- sin DDJJ patrimonial.
+  // Mostramos lo que sí tenemos y marcamos el resto como "No disponible"
+  // en vez de "—"/0.0, que sugeriría datos reales con valor cero.
+  if (poder === 'jud') {
+    const nd = '<span style="color:#5a6480">No disponible</span>';
+    tb.innerHTML = d.slice(0, 200).map((r, i) => `<tr>
+      <td class="mono text-muted">${i + 1}</td>
+      <td><strong>${(r.nombre || '—').substring(0, 35)}</strong></td>
+      <td class="text-muted">${(r.camara || r.organismo || '—').toString().substring(0, 25)}</td>
+      <td class="text-muted">${(r.cargo || '—').toString().substring(0, 22)}</td>
+      <td class="text-right mono">${nd}</td>
+      <td class="text-right mono">${nd}</td>
+      <td class="text-right">${nd}</td>
+      <td class="text-right mono">${nd}</td>
+      <td>${nd}</td>
+      <td>${r.ddjj_consulta_url
+        ? `<a class="btn-ver" href="${r.ddjj_consulta_url}" target="_blank" rel="noopener">DDJJ →</a>`
+        : '—'}</td>
+    </tr>`).join('');
+    return;
+  }
+
   const col2 = poder === 'leg' ? 'camara' : poder === 'jud' ? 'fuero' : 'organismo';
   const col3 = poder === 'leg' ? 'bloque' : 'cargo';
 
@@ -1343,8 +1393,8 @@ function filtrar(poder) {
   const extra = document.getElementById(extMap[poder])?.value || '';
 
   FILT[poder] = DATA[poder].filter(r => {
-    const nombre = (r.funcionario_apellido_nombre || r.nombre_completo || r.apellido_nombre || '').toLowerCase();
-    const org    = (r.organismo || r.bloque || r.fuero || '').toLowerCase();
+    const nombre = (r.funcionario_apellido_nombre || r.nombre_completo || r.apellido_nombre || r.nombre || '').toLowerCase();
+    const org    = (r.organismo || r.bloque || r.fuero || r.camara || '').toLowerCase();
 
     if (busq && !nombre.includes(busq) && !org.includes(busq)) return false;
     if (nivel && (r.nivel_riesgo || '').toUpperCase() !== nivel.toUpperCase()) return false;
@@ -1355,7 +1405,7 @@ function filtrar(poder) {
       const cam = (r.camara || '');
       if (!cam.startsWith(extra)) return false;
     } else if (extra && poder === 'jud') {
-      if ((r.fuero || r.organismo || '') !== extra) return false;
+      if ((r.fuero || r.camara || r.organismo || '') !== extra) return false;
     }
     return true;
   });
@@ -1627,6 +1677,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 
 
 // ── Switch paneles estáticos (Manual / Indicadores / Autor) ───────────────
+function switchPanel(panel, el) {
+  document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.poder-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const p = document.getElementById('panel-' + panel);
+  if (p) p.classList.add('active');
+}
+
 // ── Switch de panel de poder ───────────────────────────────────────────────
 function switchPoder(poder, el) {
   document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
