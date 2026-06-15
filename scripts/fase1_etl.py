@@ -230,8 +230,21 @@ def construir_tabla_judicial(magistrados: pd.DataFrame) -> pd.DataFrame:
         "cobertura":         df.get("cargo_cobertura",   pd.Series(dtype=str)),
         "ddjj_estado":       "NO_DISPONIBLE_PUBLICAMENTE",
         "ddjj_consulta_url": MAGISTRADOS_CONSULTA,
+        # Campos adicionales reales del dataset Magistrados-Justicia-Federal-Nacional
+        # (mismo resource que MAGISTRADOS_URL), utiles para KPIs/graficos honestos
+        # del panel Judicial sin depender de DDJJ patrimonial (no publica).
+        "tipo_justicia":       df.get("justicia_federal_o_nacional", pd.Series(dtype=str)),
+        "vacante":             df.get("cargo_vacante",       pd.Series(dtype=str)),
+        "en_licencia":         df.get("cargo_licencia",      pd.Series(dtype=str)),
+        "concurso_en_tramite": df.get("concurso_en_tramite", pd.Series(dtype=str)),
+        "presidente_camara":   df.get("presidente_camara",   pd.Series(dtype=str)),
+        "norma_fecha":         df.get("norma_fecha",         pd.Series(dtype=str)),
     })
     tabla = tabla[tabla["nombre"].notna() & (tabla["nombre"].astype(str).str.strip() != "")]
+    # vacante/en_licencia ausentes -> "NO" (estos registros son cargos cubiertos,
+    # no plazas vacantes); el resto de campos opcionales quedan NaN si faltan.
+    for col in ["vacante", "en_licencia"]:
+        tabla[col] = tabla[col].fillna("NO")
     log.info(f"  ✓ tabla_judicial.csv — {len(tabla)} magistrados")
     return tabla
 

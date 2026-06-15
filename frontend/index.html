@@ -472,18 +472,18 @@
     <div class="kpis" id="kpis-jud"></div>
     <div class="grid2">
       <div class="card">
-        <div class="card-title">📊 Distribución por Fuero</div>
+        <div class="card-title">📊 Distribución por Cámara</div>
         <div class="chart-wrap"><canvas id="chart-jud-fuero"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">📈 Score medio por fuero</div>
-        <div class="chart-wrap"><canvas id="chart-jud-score"></canvas></div>
+        <div class="card-title">⚖️ Justicia Federal vs. Nacional</div>
+        <div class="chart-wrap"><canvas id="chart-jud-tipo"></canvas></div>
       </div>
     </div>
     <div class="card">
       <div class="card-title">⚖️ Ranking del Poder Judicial</div>
       <div class="filters">
-        <input id="busq-jud" placeholder="🔍  Buscar nombre, fuero…" oninput="filtrar('jud')">
+        <input id="busq-jud" placeholder="🔍  Buscar nombre, cámara…" oninput="filtrar('jud')">
         <select id="fuero-jud" onchange="filtrar('jud')">
           <option value="">Todos los fueros</option>
         </select>
@@ -1272,33 +1272,43 @@ function renderChartsJud() {
   const d = DATA.jud;
   if (!d.length) return;
 
-  // Por fuero
-  const fueros = {};
-  d.forEach(r => { const f = r.fuero || r.organismo || 'Otros'; fueros[f] = (fueros[f] || []).concat(r.score_total||0); });
-  const fArr = Object.entries(fueros).sort((a,b)=>b[1].length-a[1].length).slice(0,8);
+  // Por cámara/fuero (dato real de tabla_judicial.csv)
+  const camaras = {};
+  d.forEach(r => {
+    const c = r.camara || r.organismo || 'Otros';
+    camaras[c] = (camaras[c] || 0) + 1;
+  });
+  const cArr = Object.entries(camaras).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
   mkChart('chart-jud-fuero', 'doughnut',
-    fArr.map(([k])=>k.substring(0,20)),
-    [{ data: fArr.map(([,v])=>v.length),
+    cArr.map(([k])=>k.substring(0,28)),
+    [{ data: cArr.map(([,v])=>v),
        backgroundColor: ['#3b6fff','#00d4aa','#ff6b35','#e63946','#ffd060','#a78bfa','#60a5fa','#f472b6'],
        borderWidth: 0 }],
     { plugins: { legend: { position: 'bottom', labels: { color: '#7a8aaa', font: { size: 9 } } } } }
   );
 
-  mkChart('chart-jud-score', 'bar',
-    fArr.map(([k])=>k.substring(0,18)),
-    [{ label: 'Score medio', data: fArr.map(([,v])=>(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1)),
-       backgroundColor: '#3b6fff88', borderColor: '#3b6fff', borderWidth: 1, borderRadius: 4 }],
-    { indexAxis: 'y', plugins: { legend: { display: false } },
-      scales: { x: { max: 100, ticks: { color: '#5a6480' }, grid: { color: '#1e2535' } },
-                y: { ticks: { color: '#5a6480', font: { size: 9 } }, grid: { color: '#1e2535' } } } }
+  // Federal vs Nacional (campo tipo_justicia, dato real)
+  const tipos = {};
+  d.forEach(r => {
+    const t = r.tipo_justicia || 'Sin dato';
+    tipos[t] = (tipos[t] || 0) + 1;
+  });
+  const tArr = Object.entries(tipos).sort((a,b)=>b[1]-a[1]);
+
+  mkChart('chart-jud-tipo', 'doughnut',
+    tArr.map(([k])=>k),
+    [{ data: tArr.map(([,v])=>v),
+       backgroundColor: ['#3b6fff','#00d4aa','#5a6480'],
+       borderWidth: 0 }],
+    { plugins: { legend: { position: 'bottom', labels: { color: '#7a8aaa', font: { size: 9 } } } } }
   );
 
-  // Poblar select de fueros
+  // Poblar select de camaras (coincide con el campo usado en filtrar('jud'))
   const sel = document.getElementById('fuero-jud');
-  fArr.forEach(([k]) => {
+  cArr.forEach(([k]) => {
     const opt = document.createElement('option');
-    opt.value = k; opt.textContent = k;
+    opt.value = k; opt.textContent = k.substring(0,40);
     sel.appendChild(opt);
   });
 }
