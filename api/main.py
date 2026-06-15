@@ -13,7 +13,7 @@ from datetime import datetime
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 BASE_DIR  = Path(__file__).resolve().parent.parent
 PROC_DIR  = BASE_DIR / "data" / "processed"
@@ -45,6 +45,22 @@ def _col(df: pd.DataFrame, candidatos: list[str]) -> str | None:
     return None
 
 
+def _norm_cuit(v) -> str:
+    """Normaliza un CUIT a string de solo dígitos: maneja notación científica,
+    guiones y '.0' final. Igual criterio que norm_cuit() en /api/historico."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    s = str(v).strip().replace("-", "")
+    if "e+" in s.lower() or "e-" in s.lower():
+        try:
+            s = str(int(float(s)))
+        except (ValueError, OverflowError):
+            return ""
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+
 def _mask_poder(df: pd.DataFrame, poder: str) -> pd.Series:
     """
     Usa el campo 'poder' generado por enriquecer_poder() en fase1.
@@ -73,6 +89,14 @@ def dashboard():
     if p.exists():
         return p.read_text(encoding="utf-8")
     return "<h1>Monitor DDJJ</h1><p>Corré el pipeline para generar los datos.</p>"
+
+
+@app.get("/inocencia_overlay.js")
+def inocencia_overlay_js():
+    p = FRONT_DIR / "inocencia_overlay.js"
+    if not p.exists():
+        raise HTTPException(404, "inocencia_overlay.js no encontrado")
+    return FileResponse(p, media_type="application/javascript")
 
 
 # ── Resumen general ───────────────────────────────────────────────────────
@@ -307,6 +331,93 @@ def perfil_funcionario(cuil: str):
             alertas_func.extend(_rec(sub))
 
     return {"perfil": row, "alertas": alertas_func}
+
+
+# ── Constancias ARCA / Régimen Simplificado (Inocencia Fiscal) ──────────────
+
+@app.get("/api/constancias/{cuit}")
+def constancia_cuit(cuit: str):
+    """
+    Devuelve el estado de constancia ARCA (A13) y dos indicadores
+    relacionados al Régimen Simplificado de Ganancias (Ley 27.799 /
+    RG 5820/2026) para un CUIT dado:
+
+      - cumple_topes_regimen_simplificado: SI / NO / SIN_DATOS
+            Basado únicamente en topes de ingresos y patrimonio.
+            Dato real, disponible para la mayoría de los registros.
+
+      - elegible_regimen_simplificado: SI / NO / SIN_DATOS
+            Topes + condición de Gran Contribuyente Nacional (GCN).
+            El padrón GCN todavía no está integrado, por lo que este
+            campo va a devolver mayormente SIN_DATOS hasta que se
+            resuelva (ver scripts/regimen_simplificado.py).
+
+    IMPORTANTE: ninguno de estos dos campos implica adhesión efectiva
+    al régimen — eso requiere verificar la caracterización 618 en ARCA
+    (ws_sr_constancia_inscripcion), que tampoco está integrado todavía.
+
+    Fuentes:
+      - data/processed/constancias_arca.csv
+      - data/processed/elegibilidad_regimen_simplificado.csv
+    """
+    cuit_limpio = _norm_cuit(cuit)
+    if not cuit_limpio:
+        raise HTTPException(400, f"CUIT inválido: {cuit}")
+
+    resultado = {
+        "cuit": cuit_limpio,
+        "arca_estado_cuit": None,
+        "arca_nombre": None,
+        "arca_apellido": None,
+        "arca_razon_social": None,
+        "arca_actividad_ppal": None,
+        "arca_provincia": None,
+        "arca_fecha_consulta": None,
+        "cumple_topes_regimen_simplificado": "SIN_DATOS",  # SI / NO / SIN_DATOS
+        "elegible_regimen_simplificado":     "SIN_DATOS",  # SI / NO / SIN_DATOS
+    }
+
+    encontrado = False
+
+    # 1) Constancia ARCA (padrón A13)
+    df_const = _csv("constancias_arca.csv")
+    if not df_const.empty:
+        c_cuit = _col(df_const, ["cuit", "cuil"])
+        if c_cuit:
+            mask = df_const[c_cuit].apply(_norm_cuit) == cuit_limpio
+            if mask.any():
+                fila = df_const[mask].iloc[0]
+                for campo in [
+                    "arca_estado_cuit", "arca_nombre", "arca_apellido",
+                    "arca_razon_social", "arca_actividad_ppal",
+                    "arca_provincia", "arca_fecha_consulta",
+                ]:
+                    if campo in fila and pd.notna(fila[campo]):
+                        resultado[campo] = fila[campo]
+                encontrado = True
+
+    # 2) Topes económicos + elegibilidad al Régimen Simplificado
+    df_eleg = _csv("elegibilidad_regimen_simplificado.csv")
+    if not df_eleg.empty:
+        c_cuit = _col(df_eleg, ["cuit", "cuil"])
+        if c_cuit:
+            mask = df_eleg[c_cuit].apply(_norm_cuit) == cuit_limpio
+            if mask.any():
+                fila = df_eleg[mask].iloc[0]
+                for campo_csv, campo_api in [
+                    ("cumple_topes_economicos",       "cumple_topes_regimen_simplificado"),
+                    ("elegible_regimen_simplificado", "elegible_regimen_simplificado"),
+                ]:
+                    if campo_csv in fila:
+                        valor = fila.get(campo_csv)
+                        if pd.notna(valor) and valor in ("SI", "NO", "SIN_DATOS"):
+                            resultado[campo_api] = valor
+                encontrado = True
+
+    if not encontrado:
+        raise HTTPException(404, f"CUIT {cuit} no encontrado en constancias ni en elegibilidad.")
+
+    return resultado
 
 
 # ── Judicial ──────────────────────────────────────────────────────────────
