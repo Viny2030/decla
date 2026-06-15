@@ -24,9 +24,7 @@
     --mono:      'IBM Plex Mono', monospace;
     --sans:      'IBM Plex Sans', sans-serif;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     background: var(--bg);
     color: var(--text);
@@ -1629,14 +1627,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 
 
 // ── Switch paneles estáticos (Manual / Indicadores / Autor) ───────────────
-function switchPanel(panel, el) {
-  document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.poder-panel').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  const p = document.getElementById('panel-' + panel);
-  if (p) p.classList.add('active');
-}
-
 // ── Switch de panel de poder ───────────────────────────────────────────────
 function switchPoder(poder, el) {
   document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
@@ -1644,14 +1634,20 @@ function switchPoder(poder, el) {
   el.classList.add('active');
   document.getElementById('panel-' + poder).classList.add('active');
 
+  // Los onclick pasan nombres completos en español ('ejecutivo', 'legislativo',
+  // 'judicial'), que coinciden con los IDs de los paneles (panel-ejecutivo, etc.),
+  // pero DATA/cargarPoder/renderKPIs/renderTabla usan claves cortas (eje/leg/jud).
+  const KEY_MAP = { ejecutivo: 'eje', legislativo: 'leg', judicial: 'jud' };
+  const key = KEY_MAP[poder] || poder;
+
   // Cargar si no hay datos aún
-  if (!DATA[poder].length) {
-    cargarPoder(poder).then(() => {
-      renderKPIs(poder);
-      if (poder === 'eje') renderChartsEje();
-      if (poder === 'leg') renderChartsLeg();
-      if (poder === 'jud') renderChartsJud();
-      renderTabla(poder);
+  if (!DATA[key].length) {
+    cargarPoder(key).then(() => {
+      renderKPIs(key);
+      if (key === 'eje') renderChartsEje();
+      if (key === 'leg') renderChartsLeg();
+      if (key === 'jud') renderChartsJud();
+      renderTabla(key);
     });
   }
 }
@@ -1691,5 +1687,6 @@ function updateTS() {
   });
 })();
 </script>
+<script src="inocencia_overlay.js"></script>
 </body>
 </html>
