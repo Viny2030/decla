@@ -15,6 +15,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+try:
+    from scripts.utils_oa import parsear_oa_serie
+except ImportError:
+    from utils_oa import parsear_oa_serie
+
 logging.basicConfig(level=logging.INFO, format="[SCORING] %(message)s")
 log = logging.getLogger(__name__)
 
@@ -57,9 +62,13 @@ def calcular_ivpi(df: pd.DataFrame) -> pd.DataFrame:
 
     # Deflactar filas sin _usd usando tc_conversion_usd
     tc = pd.to_numeric(df.get("tc_conversion_usd", pd.Series(1045.0, index=df.index)), errors="coerce").fillna(1045.0)
+
     def _to_usd(col_usd, col_ars):
         usd = pd.to_numeric(df[col_usd], errors="coerce") if col_usd and col_usd in df.columns else pd.Series(np.nan, index=df.index)
-        ars = pd.to_numeric(df[col_ars],  errors="coerce") if col_ars  and col_ars  in df.columns else pd.Series(np.nan, index=df.index)
+        # Defensivo: resuelve formato OA "11401021-93" si la columna ARS no
+        # llegó ya convertida por fase1_etl.py (deflactar). Si ya es numérica,
+        # parsear_oa_serie la deja igual.
+        ars = parsear_oa_serie(df[col_ars]) if col_ars and col_ars in df.columns else pd.Series(np.nan, index=df.index)
         # Combinar: preferir USD si válido, sino ARS/TC
         combined = usd.where(usd.notna(), ars / tc)
         return combined

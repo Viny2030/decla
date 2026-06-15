@@ -17,6 +17,11 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+try:
+    from scripts.utils_oa import parsear_oa_serie
+except ImportError:
+    from utils_oa import parsear_oa_serie
+
 logging.basicConfig(level=logging.INFO, format="[ETL] %(message)s")
 log = logging.getLogger(__name__)
 
@@ -153,16 +158,35 @@ def limpiar_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def deflactar(df: pd.DataFrame, tc: float) -> pd.DataFrame:
+    """
+    Convierte a numérico (resolviendo formato OA "11401021-93" → 11401021.93)
+    y genera la columna _usd para cada columna monetaria detectada.
+
+    IMPORTANTE: la columna original (ARS) queda sobrescrita con su versión
+    numérica — antes quedaba como string OA crudo, lo que rompía cálculos
+    downstream (fase3_scoring.py) en ~88% de las filas.
+    """
     cols_mon = [c for c in df.columns if any(
         k in c for k in ["patrimonio", "inmueble", "deposito", "efectivo",
-                          "vehiculo", "credito", "deuda", "activo", "pasivo"]
+                          "vehiculo", "credito", "deuda", "activo", "pasivo",
+                          "bienes", "ingreso"]
     )]
+
+    convertidas = 0
     for col in cols_mon:
-        df[col + "_usd"] = pd.to_numeric(df[col], errors="coerce").apply(
+        antes_na = df[col].isna().sum()
+        df[col] = parsear_oa_serie(df[col])
+        nuevos_na = int(df[col].isna().sum() - antes_na)
+        if nuevos_na > 0:
+            log.warning(f"  {col}: {nuevos_na} valores no convertibles (quedan NaN)")
+
+        df[col + "_usd"] = df[col].apply(
             lambda v: round(v / tc, 2) if pd.notna(v) and v != 0 else None
         )
-    if cols_mon:
-        log.info(f"  Deflactadas {len(cols_mon)} columnas → USD (TC ${tc:.0f})")
+        convertidas += 1
+
+    if convertidas:
+        log.info(f"  Convertidas/deflactadas {convertidas} columnas → ARS numérico + USD (TC ${tc:.0f})")
     return df
 
 
