@@ -1,12 +1,26 @@
 """
 scripts/fase3_scoring.py
-━━━━━━━━━━━━━━━━━━━━━━━━
-Fase 3 — Scoring de Riesgo Institucional (Reglas Deterministas)
-  · IVPI — Índice de Variación Patrimonial Injustificada
-  · Opacidad — efectivo vs. bancarizado
-  · Fuga — activos locales vs. offshore
+Fase 3 - Scoring de Riesgo Institucional (Reglas Deterministas)
+  - IVPI: Indice de Variacion Patrimonial Injustificada
+  - Opacidad: efectivo vs. bancarizado
+  - Fuga: activos locales vs. offshore
 
 Salida: data/processed/scoring_riesgo.csv
+
+FIX TC POR ANNO (2026-06-28):
+  total_bienes_inicio = patrimonio al INICIO del anno declarado = cierre anno ANTERIOR
+  Por lo tanto se deflacta con TC del anno anterior, no del anno declarado.
+
+  TC oficiales BNA cierre de diciembre:
+    2021: 102.75
+    2022: 177.16
+    2023: 808.45
+    2024: 1045.00
+
+  Ejemplo DDJJ 2024:
+    total_bienes_inicio (cierre 2023) -> TC_ANT = 808.45
+    total_bienes_final  (cierre 2024) -> TC_ACT = 1045.00
+    total_ingreso_neto  (del anno 2024) -> TC_ACT = 1045.00
 """
 
 import logging
@@ -15,47 +29,115 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+try:
+    from scripts.utils_oa import parsear_oa_serie
+except ImportError:
+    from utils_oa import parsear_oa_serie
+
 logging.basicConfig(level=logging.INFO, format="[SCORING] %(message)s")
 log = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROC_DIR = BASE_DIR / "data" / "processed"
 
-# Umbrales FATF / OCDE
 UMBRAL_IVPI_ROJO      = 3.0
 UMBRAL_IVPI_AMARILLO  = 1.5
 UMBRAL_EFECTIVO_ROJO  = 0.5
 UMBRAL_OFFSHORE_ROJO  = 0.2
 
+# TC oficial BNA al cierre de diciembre de cada anno
+TC_POR_ANNO = {
+    2021: 102.75,
+    2022: 177.16,
+    2023: 808.45,
+    2024: 1045.00,
+}
+TC_DEFAULT = 1045.00  # fallback para annos no mapeados
 
-def _col(df: pd.DataFrame, candidatos: list[str]) -> str | None:
+
+def _tc_act(anio_series):
+    """TC del anno declarado: para bienes_final e ingresos."""
+    return anio_series.map(
+        lambda a: TC_POR_ANNO.get(int(a) if pd.notna(a) else 2024, TC_DEFAULT)
+    )
+
+
+def _tc_ant(anio_series):
+    """TC del anno ANTERIOR al declarado: para bienes_inicio."""
+    return anio_series.map(
+        lambda a: TC_POR_ANNO.get(
+            (int(a) - 1) if pd.notna(a) else 2023,
+            TC_POR_ANNO.get(2023)
+        )
+    )
+
+
+def _col(df, candidatos):
     for c in candidatos:
         if c in df.columns:
             return c
     return None
 
 
-def _cargar(nombre: str) -> pd.DataFrame:
+def _cargar(nombre):
     p = PROC_DIR / nombre
     return pd.read_csv(p, low_memory=False) if p.exists() else pd.DataFrame()
 
 
-def calcular_ivpi(df: pd.DataFrame) -> pd.DataFrame:
-    c_act  = _col(df, ["patrimonio_neto_usd", "patrimonio_neto_2024_usd", "patrimonio_neto"])
-    c_ant  = _col(df, ["patrimonio_neto_anterior_usd", "patrimonio_neto_2023_usd", "patrimonio_neto_anterior"])
-    c_ingr = _col(df, ["ingresos_declarados", "ingresos_anuales", "ingresos_usd", "remuneracion"])
+def calcular_ivpi(df):
+    c_act  = _col(df, ["total_bienes_final_usd",  "total_bienes_final",
+                        "patrimonio_neto_usd",      "patrimonio_neto"])
+    c_ant  = _col(df, ["total_bienes_inicio_usd",  "total_bienes_inicio",
+                        "patrimonio_neto_anterior_usd", "patrimonio_neto_anterior"])
+    c_ingr = _col(df, ["total_ingreso_neto_c1234_usd", "total_ingreso_neto_c1234",
+                        "ingresos_neto_gastos_usd",     "ingresos_neto_gastos",
+                        "ingresos_declarados",          "ingresos_usd"])
 
     if not all([c_act, c_ant, c_ingr]):
-        log.warning("Sin columnas para IVPI — marcando SIN_DATOS")
-        df["ivpi"] = np.nan
+        log.warning("Sin columnas para IVPI -- marcando SIN_DATOS")
+        df["ivpi"]         = np.nan
         df["ivpi_bandera"] = "SIN_DATOS"
         return df
 
-    df["pn_actual"] = pd.to_numeric(df[c_act],  errors="coerce")
-    df["pn_ant"]    = pd.to_numeric(df[c_ant],   errors="coerce")
-    df["ingresos"]  = pd.to_numeric(df[c_ingr],  errors="coerce")
-    df["delta_pn"]  = df["pn_actual"] - df["pn_ant"]
-    df["ivpi"]      = (df["delta_pn"] / df["ingresos"].replace(0, np.nan)).round(3)
+    anio_col = _col(df, ["anio", "anno", "periodo", "anio_declaracion"])
+    anio_series = pd.to_numeric(df[anio_col], errors="coerce").fillna(2024) if anio_col else pd.Series(2024, index=df.index)
+
+    tc_act = _tc_act(anio_series)
+    tc_ant = _tc_ant(anio_series)
+
+    def _ars_to_usd(col_ars, tc_serie):
+        """Convierte columna ARS a USD con TC vectorizado. Ignora columnas _usd precalculadas."""
+        if not col_ars or col_ars not in df.columns:
+            return pd.Series(np.nan, index=df.index)
+        ars = parsear_oa_serie(df[col_ars])
+        return (ars / tc_serie).where(ars.notna())
+
+    def _to_usd(col_usd, col_ars, tc_serie):
+        """Prefiere _usd si existe, sino convierte desde ARS."""
+        usd = pd.to_numeric(df[col_usd], errors="coerce") if col_usd and col_usd in df.columns else pd.Series(np.nan, index=df.index)
+        return usd.where(usd.notna(), _ars_to_usd(col_ars, tc_serie))
+
+    c_act_ars  = _col(df, ["total_bienes_final",   "patrimonio_neto"])
+    c_ant_ars  = _col(df, ["total_bienes_inicio"])
+    c_ingr_ars = _col(df, ["total_ingreso_neto_c1234", "ingresos_neto_gastos"])
+
+    # pn_actual e ingresos: TC del anno declarado
+    df["pn_actual"] = ars2usd(ca_act, tca)
+    df["ingresos"] = ars2usd(ca_ing, tca)
+
+    # pn_ant: FORZAR desde ARS con TC del anno ANTERIOR
+    # NO usar _to_usd porque total_bienes_inicio_usd fue deflactada por fase1 con TC incorrecto
+    df["pn_ant"] = _ars_to_usd(c_ant_ars, tc_ant)
+
+    # TC guardado en CSV para el frontend
+    df["tc_conversion_usd"] = tc_act.round(2)
+    df["tc_ant_usd"]        = tc_ant.round(2)
+
+    df["delta_pn"] = df["pn_actual"] - df["pn_ant"]
+
+    # Ingresos < 100 USD: datos invalidos, excluir del IVPI
+    ingresos_validos = df["ingresos"].where(df["ingresos"] >= 100.0)
+    df["ivpi"] = (df["delta_pn"] / ingresos_validos.replace(0, np.nan)).round(3)
 
     df["ivpi_bandera"] = df["ivpi"].apply(
         lambda v: "ROJA"     if pd.notna(v) and v > UMBRAL_IVPI_ROJO
@@ -69,12 +151,12 @@ def calcular_ivpi(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def calcular_opacidad(df: pd.DataFrame) -> pd.DataFrame:
+def calcular_opacidad(df):
     c_ef = _col(df, ["efectivo", "dinero_en_efectivo", "ef"])
-    c_pt = _col(df, ["pn_actual", "patrimonio_neto_usd", "patrimonio_neto"])
+    c_pt = _col(df, ["pn_actual", "total_bienes_final", "patrimonio_neto_usd", "patrimonio_neto"])
 
     if not (c_ef and c_pt):
-        df["opacidad_ratio"] = np.nan
+        df["opacidad_ratio"]   = np.nan
         df["opacidad_bandera"] = "SIN_DATOS"
         return df
 
@@ -82,20 +164,20 @@ def calcular_opacidad(df: pd.DataFrame) -> pd.DataFrame:
     pt = pd.to_numeric(df[c_pt], errors="coerce").replace(0, np.nan)
     df["opacidad_ratio"]   = (ef / pt).round(3)
     df["opacidad_bandera"] = df["opacidad_ratio"].apply(
-        lambda v: "ROJA" if pd.notna(v) and v > UMBRAL_EFECTIVO_ROJO
-        else "VERDE"     if pd.notna(v)
+        lambda v: "ROJA"  if pd.notna(v) and v > UMBRAL_EFECTIVO_ROJO
+        else "VERDE"      if pd.notna(v)
         else "SIN_DATOS"
     )
     log.info(f"Opacidad: {(df['opacidad_bandera']=='ROJA').sum()} con >50% efectivo")
     return df
 
 
-def calcular_fuga(df: pd.DataFrame) -> pd.DataFrame:
+def calcular_fuga(df):
     c_ext = _col(df, ["activos_exterior", "offshore", "exterior"])
-    c_pt  = _col(df, ["pn_actual", "patrimonio_neto_usd"])
+    c_pt  = _col(df, ["pn_actual", "total_bienes_final", "patrimonio_neto_usd"])
 
     if not (c_ext and c_pt):
-        df["fuga_ratio"] = np.nan
+        df["fuga_ratio"]   = np.nan
         df["fuga_bandera"] = "SIN_DATOS"
         return df
 
@@ -103,36 +185,36 @@ def calcular_fuga(df: pd.DataFrame) -> pd.DataFrame:
     pt  = pd.to_numeric(df[c_pt],  errors="coerce").replace(0, np.nan)
     df["fuga_ratio"]   = (ext / pt).round(3)
     df["fuga_bandera"] = df["fuga_ratio"].apply(
-        lambda v: "ROJA" if pd.notna(v) and v > UMBRAL_OFFSHORE_ROJO
-        else "VERDE"     if pd.notna(v)
+        lambda v: "ROJA"  if pd.notna(v) and v > UMBRAL_OFFSHORE_ROJO
+        else "VERDE"      if pd.notna(v)
         else "SIN_DATOS"
     )
     log.info(f"Fuga: {(df['fuga_bandera']=='ROJA').sum()} con >20% offshore")
     return df
 
 
-def calcular_score(df: pd.DataFrame) -> pd.DataFrame:
+def calcular_score(df):
     def score(row):
         s = 0
-        s += 45 if row.get("ivpi_bandera")     == "ROJA" else 20 if row.get("ivpi_bandera") == "AMARILLA" else 0
-        s += 30 if row.get("opacidad_bandera") == "ROJA" else 0
-        s += 25 if row.get("fuga_bandera")     == "ROJA" else 0
+        s += 45 if row.get("ivpi_bandera")     == "ROJA"  else 20 if row.get("ivpi_bandera") == "AMARILLA" else 0
+        s += 30 if row.get("opacidad_bandera") == "ROJA"  else 0
+        s += 25 if row.get("fuga_bandera")     == "ROJA"  else 0
         return min(s, 100)
 
     df["score_riesgo"] = df.apply(score, axis=1)
     df["nivel_riesgo"] = df["score_riesgo"].apply(
-        lambda s: "CRÍTICO" if s >= 70 else "ALTO" if s >= 45 else "MEDIO" if s >= 20 else "BAJO"
+        lambda s: "CRITICO" if s >= 70 else "ALTO" if s >= 45 else "MEDIO" if s >= 20 else "BAJO"
     )
     return df
 
 
-def run_scoring() -> pd.DataFrame:
+def run_scoring():
     log.info("=" * 55)
-    log.info("FASE 3 — SCORING")
+    log.info("FASE 3 -- SCORING")
     log.info("=" * 55)
     df = _cargar("ddjj_normalizada.csv")
     if df.empty:
-        log.error("Sin datos. Corré fase1_etl.py primero.")
+        log.error("Sin datos. Corre fase1_etl.py primero.")
         return pd.DataFrame()
 
     df = calcular_ivpi(df)
@@ -141,17 +223,22 @@ def run_scoring() -> pd.DataFrame:
     df = calcular_score(df)
 
     cols = [c for c in [
-        "cuil", "cuil_declarante", "apellido_nombre", "nombre",
-        "organismo", "cargo", "periodo", "fecha_declaracion",
-        "ivpi", "ivpi_bandera", "opacidad_ratio", "opacidad_bandera",
-        "fuga_ratio", "fuga_bandera", "score_riesgo", "nivel_riesgo",
-        "pn_actual", "pn_ant", "ingresos",
+        "cuit", "funcionario_apellido_nombre", "organismo", "cargo",
+        "poder", "sector", "anio", "desde",
+        "total_bienes_inicio", "total_bienes_final", "total_ingreso_neto_c1234",
+        "ingresos_neto_gastos",
+        "pn_actual", "pn_ant", "ingresos", "delta_pn",
+        "tc_conversion_usd", "tc_ant_usd",
+        "ivpi", "ivpi_bandera",
+        "opacidad_ratio", "opacidad_bandera",
+        "fuga_ratio", "fuga_bandera",
+        "score_riesgo", "nivel_riesgo",
     ] if c in df.columns]
 
     salida = df[cols].sort_values("score_riesgo", ascending=False)
     salida.to_csv(PROC_DIR / "scoring_riesgo.csv", index=False)
 
-    for nivel in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
+    for nivel in ["CRITICO", "ALTO", "MEDIO", "BAJO"]:
         log.info(f"  {nivel}: {(salida['nivel_riesgo']==nivel).sum()}")
     return salida
 
