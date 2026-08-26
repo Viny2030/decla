@@ -55,7 +55,7 @@ MAGISTRADOS_URL = (
     "/resource/b12bdbb7-646f-4701-99b7-1109ce919dd5"
     "/download/magistrados-justicia-federal-nacional-jueces-20260605.csv"
 )
-MAGISTRADOS_CONSULTA = "https://consejomagistratura.gov.ar/index.php/declaraciones-juradas-patrimoniales/"
+MAGISTRADOS_CONSULTA = "https://ddjjpp.pjn.gov.ar"  # formulario oficial de solicitud (la DDJJ no se accede por link directo)
 
 BCRA_API = "https://api.bcra.gob.ar/estadisticas/v2.0/datosvariable/4/2023-01-01/2024-12-31"
 TC_FIJO  = 900.0

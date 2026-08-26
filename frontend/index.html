@@ -1251,6 +1251,19 @@ async function cargarPoder(poder) {
     DATA[poder] = raw?.datos ?? [];
   }
 
+  // scoring_riesgo.csv NO trae columna 'camara' para Legislativo — se deriva del
+  // texto real de 'organismo' (HONORABLE CAMARA DE DIPUTADOS.../HONORABLE SENADO...).
+  // Sin esto, el selector Diputados/Senadores y el gráfico "Score por Cámara"
+  // quedan siempre vacíos porque r.camara nunca existe.
+  if (poder === 'leg') {
+    DATA[poder].forEach(r => {
+      const org = (r.organismo || '').toUpperCase();
+      if (org.includes('DIPUTADOS'))     r.camara = 'Diputados';
+      else if (org.includes('SENADO'))   r.camara = 'Senadores';
+      else                                r.camara = 'Otro'; // legislaturas provinciales, oficinas del Congreso, etc.
+    });
+  }
+
   // Si la API no responde, usar mock
   if (!DATA[poder].length) {
     DATA[poder] = mockData(poder);
@@ -1285,7 +1298,7 @@ function renderKPIs(poder) {
           OA/datos.gob.ar. Score, patrimonio y nivel de riesgo no están
           disponibles para este poder.
           <a href="${url}" target="_blank" rel="noopener" style="color:#7aaeff;">
-            Consultar en el Consejo de la Magistratura →
+            Solicitar DDJJ al Poder Judicial (formulario oficial) →
           </a>
         </div>
       </div>
@@ -1397,7 +1410,8 @@ function renderChartsLeg() {
   // Score por cámara
   const dip = d.filter(r => r.camara === 'Diputados' || r.camara === 'D');
   const sen = d.filter(r => r.camara === 'Senadores' || r.camara === 'S');
-  const avg = arr => arr.length ? (arr.reduce((s,r)=>s+(r.score_total||0),0)/arr.length).toFixed(1) : 0;
+  // Campo real es score_riesgo (score_total solo existe en datos mock/demo)
+  const avg = arr => arr.length ? (arr.reduce((s,r)=>s+(r.score_riesgo ?? r.score_total ?? 0),0)/arr.length).toFixed(1) : 0;
   mkChart('chart-leg-camara', 'bar', ['Diputados', 'Senadores'], [{
     data: [avg(dip), avg(sen)],
     backgroundColor: ['#3b6fff', '#00d4aa'],
@@ -1501,7 +1515,7 @@ function renderTabla(poder) {
       <td class="text-right mono">${nd}</td>
       <td>${nd}</td>
       <td>${r.ddjj_consulta_url
-        ? `<a class="btn-ver" href="${r.ddjj_consulta_url}" target="_blank" rel="noopener">DDJJ →</a>`
+        ? `<a class="btn-ver" href="${r.ddjj_consulta_url}" target="_blank" rel="noopener" title="No es acceso directo: abre el formulario oficial de solicitud del Poder Judicial">Solicitar DDJJ →</a>`
         : '—'}</td>
     </tr>`).join('');
     return;
@@ -1512,7 +1526,9 @@ function renderTabla(poder) {
 
   tb.innerHTML = d.slice(0, 200).map((r, i) => {
     const col2val = poder === 'leg'
-      ? (r.camara === 'D' || r.camara === 'Diputados' ? '<span class="pill pill-blue">DIP</span>' : '<span class="pill pill-gray">SEN</span>')
+      ? (r.camara === 'D' || r.camara === 'Diputados' ? '<span class="pill pill-blue">DIP</span>'
+        : r.camara === 'S' || r.camara === 'Senadores' ? '<span class="pill pill-gray">SEN</span>'
+        : '<span class="pill" style="background:#2a3350;color:#8090b0">OTRO</span>')
       : (r[col2] || '—').toString().substring(0, 25);
 
     // Campos reales del scoring_riesgo.csv
