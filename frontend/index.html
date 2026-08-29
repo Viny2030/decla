@@ -420,7 +420,7 @@
               <th class="text-right">Score</th><th>Nivel</th><th></th>
             </tr>
           </thead>
-          <tbody id="tbody-eje"><tr class="loading-row"><td colspan="10">⏳ Cargando datos…</td></tr></tbody>
+          <tbody id="tbody-eje"><tr class="loading-row"><td colspan="10">⏳ Cargando datos… <span id="loading-note-eje" class="text-muted"></span></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -461,7 +461,7 @@
               <th class="text-right">Score</th><th>Nivel</th><th></th>
             </tr>
           </thead>
-          <tbody id="tbody-leg"><tr class="loading-row"><td colspan="10">⏳ Cargando datos…</td></tr></tbody>
+          <tbody id="tbody-leg"><tr class="loading-row"><td colspan="10">⏳ Cargando datos… <span id="loading-note-leg" class="text-muted"></span></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -501,7 +501,7 @@
               <th class="text-right">Score</th><th>Nivel</th><th></th>
             </tr>
           </thead>
-          <tbody id="tbody-jud"><tr class="loading-row"><td colspan="10">⏳ Cargando datos…</td></tr></tbody>
+          <tbody id="tbody-jud"><tr class="loading-row"><td colspan="10">⏳ Cargando datos… <span id="loading-note-jud" class="text-muted"></span></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1236,19 +1236,53 @@ function mockData(poder) {
   });
 }
 
+// ── Reconstruir records a partir del formato columnar compacto ─────────────
+// El backend (_rec_compact en api/main.py) manda /api/poder/{poder} como
+// {columns:[...], rows:[[...],...]} en vez de una lista de {col:val} por
+// fila -- para EJECUTIVO (~65.000 filas) eso evita repetir el nombre de
+// cada columna 65.000 veces, que era la causa real de que la carga inicial
+// tardara tanto que la UI parecía "colgada" en Cargando datos. Esta función
+// arma de vuelta el array de objetos de siempre, así el resto del código
+// (renderTabla, renderKPIs, filtrar, abrirFicha) no se entera del cambio.
+function _expandCompact(compact) {
+  if (!compact || !Array.isArray(compact.columns) || !Array.isArray(compact.rows)) {
+    return [];
+  }
+  const cols = compact.columns;
+  return compact.rows.map(row => {
+    const obj = {};
+    for (let i = 0; i < cols.length; i++) obj[cols[i]] = row[i];
+    return obj;
+  });
+}
+
 // ── Cargar datos por poder ─────────────────────────────────────────────────
 async function cargarPoder(poder) {
   const cntMap   = { eje: 'cnt-eje', leg: 'cnt-leg', jud: 'cnt-jud' };
   const poderAPI = { eje: 'EJECUTIVO', leg: 'LEGISLATIVO', jud: 'JUDICIAL' };
 
-  // Judicial: usar endpoint específico /api/judicial (tiene tabla propia)
-  if (poder === 'jud') {
-    const raw = await fetchJSON(API + '/api/judicial?limite=5000', true);
-    DATA[poder] = raw?.datos ?? [];
-  } else {
-    // Ejecutivo y Legislativo: usar /api/poder/{poder} — filtra server-side con campo 'poder'
-    const raw = await fetchJSON(API + `/api/poder/${poderAPI[poder]}?limite=70000`, true);
-    DATA[poder] = raw?.datos ?? [];
+  // Aviso de progreso: EJECUTIVO ronda ~65.000 declarantes -- incluso con el
+  // payload columnar compacto (ver _rec_compact / _expandCompact) la descarga
+  // puede tomar unos segundos reales. Sin este aviso, la fila
+  // "Cargando datos..." queda inmóvil y da la sensación de estar colgada en
+  // vez de simplemente trabajando con un dataset grande.
+  const noteEl = document.getElementById('loading-note-' + poder);
+  const noteTimer = setTimeout(() => {
+    if (noteEl) noteEl.textContent = '(son miles de registros, puede tardar unos segundos)';
+  }, 2500);
+
+  try {
+    // Judicial: usar endpoint específico /api/judicial (tiene tabla propia)
+    if (poder === 'jud') {
+      const raw = await fetchJSON(API + '/api/judicial?limite=5000', true);
+      DATA[poder] = raw?.datos ?? [];
+    } else {
+      // Ejecutivo y Legislativo: usar /api/poder/{poder} — filtra server-side con campo 'poder'
+      const raw = await fetchJSON(API + `/api/poder/${poderAPI[poder]}?limite=70000`, true);
+      DATA[poder] = _expandCompact(raw?.datos);
+    }
+  } finally {
+    clearTimeout(noteTimer);
   }
 
   // scoring_riesgo.csv NO trae columna 'camara' para Legislativo — se deriva del
@@ -1879,12 +1913,32 @@ function switchPanel(panel, el) {
   if (p) p.classList.add('active');
 }
 
+// ── Deep link a un poder específico ─────────────────────────────────────────
+// El hub externo mostraba 3 cards ("DDJJ Funcionarios/Legisladores/Jueces")
+// apuntando los 3 a la misma URL pelada, así que siempre caían en el panel
+// por defecto (Ejecutivo). Esta página ahora reconoce un poder pedido por
+// hash o query string, así el hub puede linkear distinto a cada uno:
+//   .../#legislativo   .../#judicial   .../?poder=judicial
+function poderDesdeURL() {
+  const porHash  = (location.hash || '').replace('#', '').toLowerCase();
+  const porQuery = (new URLSearchParams(location.search).get('poder') || '').toLowerCase();
+  const val = porHash || porQuery;
+  return ['ejecutivo', 'legislativo', 'judicial'].includes(val) ? val : null;
+}
+
 // ── Switch de panel de poder ───────────────────────────────────────────────
 function switchPoder(poder, el) {
   document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.poder-panel').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('panel-' + poder).classList.add('active');
+
+  // Reflejar el poder activo en la URL (hash) para poder linkear/bookmarkear
+  // directo a esta pestaña — es lo que necesita el hub externo para dejar de
+  // apuntar los 3 cards a la misma URL genérica.
+  if (window.history && history.replaceState) {
+    history.replaceState(null, '', '#' + poder);
+  }
 
   // Los onclick pasan nombres completos en español ('ejecutivo', 'legislativo',
   // 'judicial'), que coinciden con los IDs de los paneles (panel-ejecutivo, etc.),
@@ -1916,6 +1970,22 @@ function updateTS() {
 (async function init() {
   updateTS();
   setInterval(updateTS, 60000);
+
+  // Si la URL pide un poder específico (deep link desde el hub externo:
+  // #legislativo, #judicial, ?poder=...), activar esa pestaña ya mismo en
+  // vez de esperar a que el usuario haga click. No usa switchPoder() (que
+  // hace history.replaceState) para no pisar el hash con el que llegó el
+  // usuario, pero sí dispara la misma carga+render.
+  const poderInicial = poderDesdeURL();
+  if (poderInicial && poderInicial !== 'ejecutivo') {
+    const tabEl = document.querySelector(`.poder-tab[onclick*="'${poderInicial}'"]`);
+    if (tabEl) {
+      document.querySelectorAll('.poder-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.poder-panel').forEach(p => p.classList.remove('active'));
+      tabEl.classList.add('active');
+      document.getElementById('panel-' + poderInicial).classList.add('active');
+    }
+  }
 
   // Tipo de cambio
   await fetchUSD();

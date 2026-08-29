@@ -22,7 +22,10 @@ FRONT_DIR = BASE_DIR / "frontend"
 app = FastAPI(
     title="Monitor DDJJ",
     description="Análisis de riesgo en Declaraciones Juradas Patrimoniales — Argentina",
-    version="2.0.0",
+    version="2.1.0",
+    # v2.1.0: /api/poder/{poder} serializa "datos" en formato columnar
+    # compacto (ver _rec_compact) para arreglar el hang de "Cargando
+    # datos..." en EJECUTIVO (~65k filas -> 43.7MB en formato "records").
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET","POST"], allow_headers=["*"])
 
@@ -36,6 +39,41 @@ def _csv(nombre: str) -> pd.DataFrame:
 
 def _rec(df: pd.DataFrame) -> list[dict]:
     return json.loads(df.to_json(orient="records", force_ascii=False))
+
+
+# Columnas que el frontend realmente lee de scoring_riesgo.csv (ver
+# renderTabla/renderKPIs/filtrar/abrirFicha en frontend/index.html). El resto
+# (sector, desde, total_ingreso_neto_c1234, ingresos_neto_gastos, tc_ant_usd,
+# opacidad_ratio, fuga_ratio) no se usan en ningun lado del frontend y solo
+# inflan el payload.
+_POR_PODER_COLS = [
+    "cuit", "funcionario_apellido_nombre", "organismo", "cargo", "anio",
+    "total_bienes_inicio", "total_bienes_final", "pn_actual", "pn_ant",
+    "ingresos", "delta_pn", "tc_conversion_usd", "ivpi", "ivpi_bandera",
+    "opacidad_bandera", "fuga_bandera", "score_riesgo", "nivel_riesgo",
+]
+
+
+def _rec_compact(df: pd.DataFrame, columns: list[str] | None = None) -> dict:
+    """
+    Serializa un DataFrame como {"columns": [...], "rows": [[...], ...]}
+    en vez de la lista de objetos ({col: val, ...} por fila) que arma _rec().
+
+    _rec()/orient="records" repite el nombre de CADA columna en CADA fila.
+    Para /api/poder/EJECUTIVO (~65.000 filas x 24 columnas) eso agrega
+    ~25 millones de caracteres de puro nombre-de-columna repetido al JSON,
+    y es la causa real de que esa llamada tarde 7-10s+ en el navegador
+    (fetch + parseo) -- lo que el frontend termina mostrando como
+    "Cargando datos..." indefinido, aunque el backend ya respondio 200.
+    Formato columnar + proyectar solo las columnas usadas por el frontend
+    (ver _POR_PODER_COLS) corta ese payload a menos de la mitad sin perder
+    un solo registro (sigue viniendo el dataset completo, para no romper
+    la busqueda/filtrado del lado del cliente sobre todos los declarantes).
+    """
+    cols = [c for c in (columns or df.columns.tolist()) if c in df.columns]
+    sub = df[cols] if columns else df
+    raw = json.loads(sub.to_json(orient="split", index=False, force_ascii=False))
+    return {"columns": raw["columns"], "rows": raw["data"]}
 
 
 def _col(df: pd.DataFrame, candidatos: list[str]) -> str | None:
@@ -182,7 +220,7 @@ def por_poder(
         "total":      len(df),
         "poder":      p,
         "organismos": organismos[:100],
-        "datos":      _rec(df),
+        "datos":      _rec_compact(df, _POR_PODER_COLS),
     }
 
 
