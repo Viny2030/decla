@@ -1976,7 +1976,9 @@ function updateTS() {
   // vez de esperar a que el usuario haga click. No usa switchPoder() (que
   // hace history.replaceState) para no pisar el hash con el que llegó el
   // usuario, pero sí dispara la misma carga+render.
+  const KEY_MAP_INIT = { ejecutivo: 'eje', legislativo: 'leg', judicial: 'jud' };
   const poderInicial = poderDesdeURL();
+  const keyInicial   = KEY_MAP_INIT[poderInicial] || 'eje';
   if (poderInicial && poderInicial !== 'ejecutivo') {
     const tabEl = document.querySelector(`.poder-tab[onclick*="'${poderInicial}'"]`);
     if (tabEl) {
@@ -1990,22 +1992,27 @@ function updateTS() {
   // Tipo de cambio
   await fetchUSD();
 
-  // Cargar ejecutivo primero (panel activo por defecto)
-  await cargarPoder('eje');
-  renderKPIs('eje');
-  renderChartsEje();
-  renderTabla('eje');
+  // Cargar primero el panel realmente visible (Ejecutivo por defecto, o el
+  // que haya pedido el deep link) -- si siempre se cargara Ejecutivo primero
+  // (que es el más pesado, ~65.000 filas), alguien que entra directo a
+  // .../#legislativo se quedaba viendo "Cargando datos..." en Legislativo
+  // mientras de fondo esperaba, sin necesidad, a que termine Ejecutivo.
+  await cargarPoder(keyInicial);
+  renderKPIs(keyInicial);
+  if (keyInicial === 'eje') renderChartsEje();
+  if (keyInicial === 'leg') renderChartsLeg();
+  if (keyInicial === 'jud') renderChartsJud();
+  renderTabla(keyInicial);
 
-  // Precargar legislativo y judicial en background
-  cargarPoder('leg').then(() => {
-    renderKPIs('leg');
-    renderChartsLeg();
-    renderTabla('leg');
-  });
-  cargarPoder('jud').then(() => {
-    renderKPIs('jud');
-    renderChartsJud();
-    renderTabla('jud');
+  // Precargar los otros dos poderes en background
+  ['eje', 'leg', 'jud'].filter(k => k !== keyInicial).forEach(key => {
+    cargarPoder(key).then(() => {
+      renderKPIs(key);
+      if (key === 'eje') renderChartsEje();
+      if (key === 'leg') renderChartsLeg();
+      if (key === 'jud') renderChartsJud();
+      renderTabla(key);
+    });
   });
 })();
 </script>
