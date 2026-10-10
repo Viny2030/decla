@@ -57,8 +57,12 @@ MAGISTRADOS_URL = (
 )
 MAGISTRADOS_CONSULTA = "https://ddjjpp.pjn.gov.ar"  # formulario oficial de solicitud (la DDJJ no se accede por link directo)
 
-BCRA_API = "https://api.bcra.gob.ar/estadisticas/v2.0/datosvariable/4/2023-01-01/2024-12-31"
-TC_FIJO  = 900.0
+# API pública de estadísticas del BCRA v4.0 (sin clave). La v2.0 que se usaba
+# devuelve 410 Gone desde 2025 y el ETL caía siempre a un TC fijo de $900.
+# Variable 4 = tipo de cambio minorista (promedio vendedor).
+BCRA_API = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4?desde={desde}&hasta={hasta}"
+# Respaldo: TC BNA de fin de diciembre (mismo que usa fase3_scoring)
+TC_RESPALDO = {2021: 102.75, 2022: 177.16, 2023: 808.45, 2024: 1045.00}
 
 
 def descargar_fuentes() -> dict[str, pd.DataFrame]:
@@ -101,27 +105,30 @@ def descargar_magistrados() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def obtener_tipo_cambio() -> float:
-    tc_path = RAW_DIR / "tipo_cambio.csv"
+def obtener_tipo_cambio(anio: int = 2024) -> float:
+    """TC minorista vendedor del último día hábil de diciembre del año declarado."""
+    tc_path = RAW_DIR / f"tipo_cambio_{anio}.csv"
     if tc_path.exists():
         try:
-            df = pd.read_csv(tc_path)
-            return float(df["valor"].iloc[-1])
+            return float(pd.read_csv(tc_path)["valor"].iloc[0])
         except Exception:
             pass
     try:
-        r = requests.get(BCRA_API, timeout=30)
+        url = BCRA_API.format(desde=f"{anio}-12-01", hasta=f"{anio}-12-31")
+        r = requests.get(url, timeout=30, headers={"User-Agent": "monitor-ddjj/1.0"})
         r.raise_for_status()
-        data = r.json().get("results", [])
-        if data:
-            df_tc = pd.DataFrame(data)[["fecha", "valor"]]
-            df_tc.to_csv(tc_path, index=False)
-            tc = float(df_tc["valor"].iloc[-1])
-            log.info(f"TC BCRA: ${tc:.2f}")
-            return tc
+        res = r.json().get("results", [])
+        detalle = res[0].get("detalle", []) if res else []
+        if detalle:
+            ult = max(detalle, key=lambda d: d["fecha"])
+            pd.DataFrame([ult]).to_csv(tc_path, index=False)
+            log.info(f"TC BCRA v4.0 ({ult['fecha']}): ${float(ult['valor']):.2f}")
+            return float(ult["valor"])
     except Exception as e:
-        log.warning(f"BCRA no disponible: {e} — usando TC fijo ${TC_FIJO}")
-    return TC_FIJO
+        log.warning(f"BCRA no disponible: {e}")
+    tc = TC_RESPALDO.get(anio, TC_RESPALDO[max(TC_RESPALDO)])
+    log.warning(f"Usando TC de respaldo ${tc:.2f} (BNA dic-{anio})")
+    return tc
 
 
 def normalizar_cuil(valor) -> str | None:
@@ -276,7 +283,9 @@ def run_etl() -> pd.DataFrame:
     log.info("=" * 55)
 
     dfs = descargar_fuentes()
-    tc  = obtener_tipo_cambio()
+    _dj = dfs.get("ddjj_anuales", pd.DataFrame())
+    _anios = pd.to_numeric(_dj["anio"], errors="coerce").dropna() if "anio" in _dj.columns else pd.Series(dtype=float)
+    tc  = obtener_tipo_cambio(int(_anios.max()) if len(_anios) else 2024)
 
     ddjj   = quitar_copias_corruptas(limpiar_df(dfs.get("ddjj_anuales", pd.DataFrame())))
     # Detalle renglón por renglón: dos cajas de ahorro con el mismo saldo son dos bienes.
