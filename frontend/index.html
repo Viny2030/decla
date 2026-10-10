@@ -390,11 +390,11 @@
         <div class="chart-wrap"><canvas id="chart-eje-clasif"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">📈 Evolución Patrimonial Media (USD)</div>
+        <div class="card-title">📈 Patrimonio mediano declarado (USD)</div>
         <div class="chart-wrap"><canvas id="chart-eje-evol"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">🔗 Rupturas R1·R2·R3 por organismo</div>
+        <div class="card-title">🔗 Score medio por organismo (top 6)</div>
         <div class="chart-wrap"><canvas id="chart-eje-rupturas"></canvas></div>
       </div>
     </div>
@@ -629,20 +629,27 @@
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
           <div style="font-size:.8rem;font-weight:700;color:#ff6b35;margin-bottom:10px">⚠️ Score y nivel de riesgo</div>
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
-            El <strong style="color:#c8d0e0">score de riesgo</strong> (0–100) combina tres dimensiones:
-            IVPI (incremento patrimonial vs. ingresos), opacidad (efectivo/total) y fuga (activos en el exterior).
+            El <strong style="color:#c8d0e0">score de riesgo</strong> (0–100) suma tres dimensiones:
+            IVPI (ROJA 45 pts · AMARILLA 20), opacidad (30 pts) y fuga (25 pts).
+            <strong style="color:#c8d0e0">Hoy sólo el IVPI tiene datos</strong>: el CSV consolidado de la OA no separa efectivo
+            ni bienes en el exterior, así que opacidad y fuga figuran como "sin datos" y el score máximo posible es 45 (ALTO).
             <br><br>
-            <span style="color:#e63946">■ CRÍTICO</span> ≥75 &nbsp;
-            <span style="color:#ff6b35">■ ALTO</span> ≥50 &nbsp;
-            <span style="color:#ffd060">■ MEDIO</span> ≥25 &nbsp;
-            <span style="color:#2ec27e">■ BAJO</span> &lt;25
+            <span style="color:#e63946">■ CRÍTICO</span> ≥70 &nbsp;
+            <span style="color:#ff6b35">■ ALTO</span> ≥45 &nbsp;
+            <span style="color:#ffd060">■ MEDIO</span> ≥20 &nbsp;
+            <span style="color:#2ec27e">■ BAJO</span> &lt;20
           </p>
         </div>
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
           <div style="font-size:.8rem;font-weight:700;color:#ffd060;margin-bottom:10px">📊 IVPI — Índice de Variación Patrimonial</div>
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
-            IVPI = Δpatrimonio USD / ingresos USD declarados. Un IVPI de <strong style="color:#c8d0e0">2×</strong> significa
-            que el patrimonio creció el doble de lo declarado como ingreso.
+            IVPI = aumento del patrimonio neto (bienes − deudas) <em>no explicado</em> / ingresos declarados del año.
+            Se descuentan la revaluación de bienes ya declarados y las herencias, y se calcula en pesos
+            (el dólar sólo se usa para mostrar montos). Un IVPI de <strong style="color:#c8d0e0">2×</strong> significa
+            que el patrimonio creció, sin explicación declarada, el doble de lo que la persona declaró ganar.
+            <br>Se evalúa sólo en DDJJ <strong style="color:#c8d0e0">anuales</strong> (las iniciales y de baja no son comparables),
+            con ingresos de al menos USD 2.500/año y un aumento no explicado de al menos USD 10.000. Una persona = una DDJJ por año
+            (se toma la anual y su última rectificativa).
             <br><br>
             <span style="color:#e63946">ROJA</span> &gt;3× &nbsp;
             <span style="color:#ffd060">AMARILLA</span> &gt;1.5× &nbsp;
@@ -655,6 +662,7 @@
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
             Mide qué proporción del patrimonio está en efectivo. Bandera roja cuando el efectivo supera el
             <strong style="color:#c8d0e0">50%</strong> del total declarado — puede indicar dificultad para trazar el origen de los fondos.
+            <br><span style="color:#5a6480;font-size:.7rem">Sin datos por ahora: el CSV de la OA no informa el efectivo por separado.</span>
           </p>
         </div>
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
@@ -662,6 +670,7 @@
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
             Mide la proporción de activos declarados en el exterior. Bandera roja cuando superan el
             <strong style="color:#c8d0e0">20%</strong> del patrimonio total.
+            <br><span style="color:#5a6480;font-size:.7rem">Sin datos por ahora: el CSV de la OA no informa los bienes del exterior por separado.</span>
           </p>
         </div>
       </div>
@@ -683,7 +692,7 @@
             <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A2</td><td style="padding:4px 6px">Beneficial Ownership (R.24/25)</td><td style="padding:4px 6px">7%</td></tr>
             <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A3</td><td style="padding:4px 6px">Cash ratio &gt;30%</td><td style="padding:4px 6px">8%</td></tr>
             <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A4</td><td style="padding:4px 6px">Jurisdicción de riesgo</td><td style="padding:4px 6px">7%</td></tr>
-            <tr><td style="padding:4px 6px;color:#3b6fff">World Bank</td><td style="padding:4px 6px">B1</td><td style="padding:4px 6px">Percentil vs. pares LAC</td><td style="padding:4px 6px">10%</td></tr>
+            <tr><td style="padding:4px 6px;color:#3b6fff">World Bank</td><td style="padding:4px 6px">B1</td><td style="padding:4px 6px">Percentil vs. pares del mismo cargo</td><td style="padding:4px 6px">10%</td></tr>
             <tr><td style="padding:4px 6px;color:#3b6fff">World Bank</td><td style="padding:4px 6px">B2</td><td style="padding:4px 6px">Brecha salario/patrimonio</td><td style="padding:4px 6px">10%</td></tr>
             <tr><td style="padding:4px 6px;color:#ffd060">TI</td><td style="padding:4px 6px">C1</td><td style="padding:4px 6px">Velocidad de acumulación</td><td style="padding:4px 6px">10%</td></tr>
             <tr><td style="padding:4px 6px;color:#ffd060">TI</td><td style="padding:4px 6px">C2</td><td style="padding:4px 6px">Sector de riesgo TI</td><td style="padding:4px 6px">5%</td></tr>
@@ -755,7 +764,7 @@
       <p style="font-size:.78rem;color:#8090b0;line-height:1.7;margin-bottom:20px">
         Cada DDJJ es evaluada contra 12 indicadores de cuatro marcos internacionales de integridad pública.
         El score se renormaliza al 100% según los indicadores con datos disponibles en los CSV públicos de la OA.
-        <strong style="color:#7aaeff">Argentina: CPI-TI 2023 = 38/100 · WB CCI percentil 43.8 · salió de lista gris FATF en 2023.</strong>
+        <strong style="color:#7aaeff">Argentina: CPI-TI 2025 = 36/100 · WB CCI percentil 43.8 · no integra la lista gris del GAFI (salió en 2014).</strong>
       </p>
 
       <!-- FATF -->
@@ -792,8 +801,8 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
-            <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">B1 · Percentil pares LAC <span style="color:#5a6480;font-weight:400">(peso 10%)</span></div>
-            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Compara patrimonio con pares del mismo cargo. P95 = 35 pts · P80 = 20 pts. Argentina percentil 43.8 vs LAC 49.3.</div>
+            <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">B1 · Percentil vs. pares del mismo cargo <span style="color:#5a6480;font-weight:400">(peso 10%)</span></div>
+            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Compara el patrimonio con funcionarios argentinos del mismo cargo (no con otros países). P95 = 35 pts · P80 = 20 pts. Contexto: Argentina percentil WGI 43.8 vs promedio LAC 49.3.</div>
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">B2 · Brecha salario &gt;10× <span style="color:#5a6480;font-weight:400">(peso 10%)</span></div>
@@ -806,7 +815,7 @@
       <div style="margin-bottom:20px">
         <div style="font-size:.75rem;font-weight:700;color:#ffd060;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
           <span style="background:#2e2200;border:1px solid #4a3800;padding:2px 8px;border-radius:4px">TRANSPARENCY INTL</span>
-          Grupo C — CPI 2023 (Argentina: 38/100)
+          Grupo C — CPI 2025 (Argentina: 36/100)
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
@@ -852,7 +861,7 @@
         El score internacional se renormaliza sobre los pesos disponibles (actualmente 50/100) para que el resultado sea comparable.
         Fuentes: <a href="https://www.fatf-gafi.org" target="_blank" style="color:#7aaeff">FATF</a> ·
         <a href="https://info.worldbank.org/governance/wgi/" target="_blank" style="color:#7aaeff">WB WGI</a> ·
-        <a href="https://www.transparency.org/en/cpi/2023" target="_blank" style="color:#7aaeff">TI CPI</a> ·
+        <a href="https://www.transparency.org/en/cpi/2025" target="_blank" style="color:#7aaeff">TI CPI</a> ·
         <a href="https://www.oecd.org/gov/ethics/" target="_blank" style="color:#7aaeff">OCDE PAI</a>
       </div>
     </div>
@@ -1069,9 +1078,9 @@ function pillNivel(nivel) {
 }
 
 function scoreColor(s) {
-  if (s >= 75) return '#ff6060';
-  if (s >= 50) return '#ffaa40';
-  if (s >= 25) return '#ffd040';
+  if (s >= 70) return '#ff6060';
+  if (s >= 45) return '#ffaa40';
+  if (s >= 20) return '#ffd040';
   return '#40d090';
 }
 
@@ -1150,91 +1159,20 @@ async function fetchJSON(url, silencioso = false) {
   try {
     const r = await fetch(url);
     if (!r.ok) {
-      if (!silencioso) console.info(`[API] ${url} → HTTP ${r.status} (usando mock)`);
+      if (!silencioso) console.info(`[API] ${url} → HTTP ${r.status}`);
       return null;
     }
     return await r.json();
   } catch (e) {
-    if (!silencioso) console.info(`[API] ${url} → ${e.message} (usando mock)`);
+    if (!silencioso) console.info(`[API] ${url} → ${e.message}`);
     return null;
   }
 }
 
-// ── Datos mock para desarrollo (cuando la API no está corriendo) ───────────
-function mockData(poder) {
-  const nombres = {
-    eje: [
-      ['MILEI, Javier Gerardo', 'Presidencia de la Nación', 'Presidente'],
-      ['FRANCOS, Guillermo José', 'Jefatura de Gabinete', 'Jefe de Gabinete'],
-      ['CAPUTO, Luis Andrés', 'Ministerio de Economía', 'Ministro'],
-      ['PETTOVELLO, Sandra Mónica', 'Capital Humano', 'Ministra'],
-      ['STURZENEGGER, Federico', 'Ministerio de Desregulación', 'Ministro'],
-      ['VILLARRUEL, Victoria Eugenia', 'Vicepresidencia', 'Vicepresidenta'],
-      ['BULLRICH, Patricia', 'Ministerio de Seguridad', 'Ministra'],
-      ['CÚNEO LIBARONA, Mariano', 'Ministerio de Justicia', 'Ministro'],
-      ['MONDINO, Diana', 'Ministerio de RREE', 'Ministra'],
-      ['BAUSILI, Santiago', 'BCRA', 'Presidente BCRA'],
-      ['MENEM, Martín', 'Presidencia HCD', 'Diputado Nacional'],
-      ['PACHECO, Lisandro', 'ANSeS', 'Titular'],
-    ],
-    leg: [
-      ['MENEM, Martín', 'D', 'La Libertad Avanza'],
-      ['LOSPENNATO, Silvia', 'D', 'PRO'],
-      ['MOREAU, Cecilia', 'D', 'Unión por la Patria'],
-      ['KICILLOF STOPPANI, Axel', 'D', 'UP'],
-      ['VIDAL, María Eugenia', 'D', 'PRO'],
-      ['ALPEROVICH, José Jorge', 'S', 'Frente de Todos'],
-      ['MICHETTI, Gabriela', 'S', 'PRO'],
-      ['PARRILLI, Oscar Alberto', 'S', 'UP'],
-      ['DURÁN, Guadalupe', 'D', 'LLA'],
-      ['TERADA, Ariel', 'S', 'UCR'],
-      ['PIOTTO, Lorena', 'D', 'LLA'],
-      ['CARRO, Graciela', 'D', 'UP'],
-    ],
-    jud: [
-      ['ROSATTI, Horacio Daniel', 'CSJN', 'Presidente CSJN'],
-      ['ROSENKRANTZ, Carlos Fernando', 'CSJN', 'Vocal CSJN'],
-      ['MAQUEDA, Juan Carlos', 'CSJN', 'Vocal CSJN'],
-      ['LORENZETTI, Ricardo Luis', 'CSJN', 'Vocal CSJN'],
-      ['VILLENA, Ana María', 'Federal Criminal', 'Jueza'],
-      ['TORRES, Sebastián', 'Contencioso Federal', 'Juez'],
-      ['CABALLERO, Marcela', 'Laboral', 'Jueza'],
-      ['ROMERO, Fabio', 'Civil y Comercial', 'Juez'],
-      ['PACHECO, Mariana', 'Penal Económico', 'Jueza'],
-      ['DÍAZ, Roberto', 'CNCAF', 'Vocal'],
-    ]
-  };
-  const entry = nombres[poder] || nombres.eje;
-  return entry.map((info, i) => {
-    const score = Math.floor(Math.random() * 80 + 5);
-    const pat   = Math.floor(Math.random() * 800000 + 50000);
-    const var_  = (Math.random() * 40 - 5).toFixed(1);
-    return {
-      cuil:              `20-${String(20000000 + i * 1234567).slice(0,8)}-${i % 9}`,
-      nombre_completo:   info[0],
-      organismo:         info[1],
-      cargo:             info[2],
-      camara:            info[1] === 'D' ? 'Diputados' : info[1] === 'S' ? 'Senadores' : undefined,
-      bloque:            poder === 'leg' ? info[2] : undefined,
-      fuero:             poder === 'jud' ? info[1] : undefined,
-      patrimonio_usd:    pat,
-      patrimonio_ars:    pat * usdRate,
-      variacion_pct:     parseFloat(var_),
-      score_total:       score,
-      nivel_riesgo:      score >= 75 ? 'CRÍTICO' : score >= 50 ? 'ALTO' : score >= 25 ? 'MEDIO' : 'BAJO',
-      icr:               (score * 0.15 + Math.random()*5).toFixed(1),
-      sog:               (score * 0.35 + Math.random()*5).toFixed(1),
-      res:               (score * 0.30 + Math.random()*5).toFixed(1),
-      via:               (score * 0.20 + Math.random()*5).toFixed(1),
-      alertas:           Math.floor(score / 20),
-      año:               2024,
-      historico:         [2021,2022,2023,2024].map(y => ({
-        año: y,
-        patrimonio_usd: Math.floor(pat * (0.6 + Math.random() * 0.8 + (y-2021)*0.1))
-      }))
-    };
-  });
-}
+// (Se eliminó mockData(): generaba scores de riesgo y patrimonios AL AZAR con
+// nombres reales de funcionarios, legisladores y jueces, y se mostraba en la
+// página pública cada vez que la API fallaba o tardaba. Si la API no responde,
+// ahora se muestra un mensaje de error y no se inventan datos.)
 
 // ── Reconstruir records a partir del formato columnar compacto ─────────────
 // El backend (_rec_compact en api/main.py) manda /api/poder/{poder} como
@@ -1257,6 +1195,7 @@ function _expandCompact(compact) {
 }
 
 // ── Cargar datos por poder ─────────────────────────────────────────────────
+const DATA_ERROR = { eje: false, leg: false, jud: false };
 async function cargarPoder(poder) {
   const cntMap   = { eje: 'cnt-eje', leg: 'cnt-leg', jud: 'cnt-jud' };
   const poderAPI = { eje: 'EJECUTIVO', leg: 'LEGISLATIVO', jud: 'JUDICIAL' };
@@ -1298,9 +1237,9 @@ async function cargarPoder(poder) {
     });
   }
 
-  // Si la API no responde, usar mock
+  // Si la API no responde NO se muestran datos de ejemplo: se avisa el error.
   if (!DATA[poder].length) {
-    DATA[poder] = mockData(poder);
+    DATA_ERROR[poder] = true;
   }
 
   FILT[poder] = [...DATA[poder]];
@@ -1397,21 +1336,15 @@ function renderChartsEje() {
     }], { plugins: { legend: { position: 'bottom', labels: { color: '#7a8aaa', font: { size: 10 } } } } }
   );
 
-  // Evolución patrimonial media por año (línea)
-  const byYear = {};
-  d.forEach(r => {
-    if (r.historico) r.historico.forEach(h => {
-      if (!byYear[h.año]) byYear[h.año] = [];
-      byYear[h.año].push(h.patrimonio_usd || 0);
-    });
-  });
-  const años = Object.keys(byYear).sort();
-  const medias = años.map(y => {
-    const arr = byYear[y];
-    return arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
-  });
+  // Patrimonio mediano declarado (USD): inicio (dic-2023) y cierre (dic-2024)
+  // de las DDJJ 2024, con el TC de cada fecha. Antes este gráfico leía un campo
+  // "historico" que sólo existía en los datos de ejemplo (aleatorios): con
+  // datos reales quedaba vacío.
+  const med = arr => { const v = arr.filter(x => x > 0).sort((a,b)=>a-b); return v.length ? Math.round(v[Math.floor(v.length/2)]) : 0; };
+  const años   = ['dic-2023', 'dic-2024'];
+  const medias = [med(d.map(r => +r.pn_ant || 0)), med(d.map(r => +r.pn_actual || 0))];
   mkChart('chart-eje-evol', 'line', años, [{
-    label: 'Patrimonio medio (USD)',
+    label: 'Patrimonio mediano (USD)',
     data: medias,
     borderColor: '#3b6fff',
     backgroundColor: '#3b6fff22',
@@ -1422,14 +1355,15 @@ function renderChartsEje() {
 
   // Rupturas por organismo (top 6)
   const orgScores = {};
-  d.forEach(r => { if (r.organismo) orgScores[r.organismo] = (orgScores[r.organismo] || []).concat(r.score_total || 0); });
+  // score_riesgo es el campo real (score_total sólo existía en los datos de ejemplo)
+  d.forEach(r => { if (r.organismo) orgScores[r.organismo] = (orgScores[r.organismo] || []).concat(r.score_riesgo ?? 0); });
   const top6 = Object.entries(orgScores)
     .map(([k,v]) => [k, v.reduce((a,b)=>a+b,0)/v.length])
     .sort((a,b)=>b[1]-a[1]).slice(0,6);
   mkChart('chart-eje-rupturas', 'bar',
     top6.map(([k])=>k.substring(0,20)),
     [{ label: 'Score medio', data: top6.map(([,v])=>v.toFixed(1)),
-       backgroundColor: top6.map(([,v]) => v>=75?'#e63946':v>=50?'#ff6b35':v>=25?'#ffd060':'#2ec27e'),
+       backgroundColor: top6.map(([,v]) => v>=70?'#e63946':v>=45?'#ff6b35':v>=20?'#ffd060':'#2ec27e'),
        borderRadius: 4 }],
     { indexAxis: 'y', plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#5a6480', font: { size: 10 } }, grid: { color: '#1e2535' }, max: 100 },
@@ -1444,7 +1378,7 @@ function renderChartsLeg() {
   // Score por cámara
   const dip = d.filter(r => r.camara === 'Diputados' || r.camara === 'D');
   const sen = d.filter(r => r.camara === 'Senadores' || r.camara === 'S');
-  // Campo real es score_riesgo (score_total solo existe en datos mock/demo)
+  // Campo real es score_riesgo (score_total es un nombre de columna viejo)
   const avg = arr => arr.length ? (arr.reduce((s,r)=>s+(r.score_riesgo ?? r.score_total ?? 0),0)/arr.length).toFixed(1) : 0;
   mkChart('chart-leg-camara', 'bar', ['Diputados', 'Senadores'], [{
     data: [avg(dip), avg(sen)],
@@ -1528,7 +1462,9 @@ function renderTabla(poder) {
   const tb = document.getElementById(tbodies[poder]);
 
   if (!d.length) {
-    tb.innerHTML = `<tr class="err-row"><td colspan="10">Sin resultados para los filtros aplicados.</td></tr>`;
+    tb.innerHTML = DATA_ERROR[poder]
+      ? `<tr class="err-row"><td colspan="10">⚠ No se pudieron cargar los datos del servidor. Reintentá en unos minutos (recargá la página).</td></tr>`
+      : `<tr class="err-row"><td colspan="10">Sin resultados para los filtros aplicados.</td></tr>`;
     return;
   }
 
@@ -1570,12 +1506,13 @@ function renderTabla(poder) {
     const usdVal  = r.pn_actual || r.patrimonio_usd;
     const scoreV  = r.score_riesgo || r.score_total || 0;
 
-    // Variación — calcular desde delta_pn/pn_ant si existen
+    // Variación del patrimonio neto en USD (pn_actual vs pn_ant). delta_pn es ahora
+    // el aumento NO explicado, por eso no se usa para el porcentaje.
     let varHtml = '<span style="color:#5a6480">—</span>';
     const delta = r.delta_pn;
     const ini   = r.pn_ant;
     if (delta != null && ini != null && ini > 0) {
-      const pct = (delta / ini) * 100;
+      const pct = r.pn_actual != null ? ((r.pn_actual - ini) / ini) * 100 : (delta / ini) * 100;
       varHtml = pct >= 0
         ? `<span style="color:#2ec27e">▲ ${pct.toFixed(1)}%</span>`
         : `<span style="color:#e63946">▼ ${Math.abs(pct).toFixed(1)}%</span>`;
@@ -1642,7 +1579,7 @@ function abrirFicha(poder, key) {
          || null;
   if (!r) return;
 
-  // Campos reales de scoring_riesgo.csv — con fallbacks para mock
+  // Campos reales de scoring_riesgo.csv (con fallbacks de nombres viejos)
   const nombre = r.funcionario_apellido_nombre || r.nombre_completo || r.apellido_nombre || '—';
   const org    = r.organismo || r.fuero || r.bloque || '—';
   const cargo  = r.cargo || r.camara || '—';
@@ -1704,7 +1641,7 @@ function abrirFicha(poder, key) {
             const ini   = r.pn_ant;
             if (!delta && !r.variacion_pct) return '—';
             if (ini > 0) {
-              const pct = (delta / ini) * 100;
+              const pct = r.pn_actual != null ? ((r.pn_actual - ini) / ini) * 100 : (delta / ini) * 100;
               return (pct >= 0 ? '▲ ' : '▼ ') + Math.abs(pct).toFixed(1) + '%';
             }
             if (r.variacion_pct) {
@@ -1729,11 +1666,11 @@ function abrirFicha(poder, key) {
           ${r.ivpi != null && r.ivpi !== '' ? Number(r.ivpi).toFixed(2) + '×' : '—'}
           <span style="font-size:.7rem;margin-left:6px">${r.ivpi_bandera||'SIN_DATOS'}</span>
         </div>
-        <div class="modal-stat-lbl">IVPI — Índice Variación Patrimonial Injustificada · (Δpatrimonio USD / ingresos USD)</div>
+        <div class="modal-stat-lbl">IVPI — aumento patrimonial no explicado / ingresos del año (cálculo en pesos)${r.ivpi_motivo ? ' · <em>' + r.ivpi_motivo + '</em>' : ''}</div>
       </div>
       <div class="modal-stat">
         <div class="modal-stat-val">${fmtUSD(r.delta_pn)}</div>
-        <div class="modal-stat-lbl">Incremento patrimonial neto · en <strong>USD</strong></div>
+        <div class="modal-stat-lbl">Aumento del patrimonio neto <strong>no explicado</strong> (descontadas revaluaciones y herencias) · en <strong>USD</strong></div>
       </div>
       <div class="modal-stat">
         <div class="modal-stat-val" style="color:${scoreColor(score)}">${score.toFixed?score.toFixed(1):score} / 100</div>
@@ -1867,7 +1804,7 @@ function abrirFicha(poder, key) {
         <div class="modal-indicators">
           ${mkInd(bd.FATF?.score,       'FATF · R.12/24/25',    scoreColor(bd.FATF?.score||0))}
           ${mkInd(bd.World_Bank?.score, 'WB · WGI CCI',         scoreColor(bd.World_Bank?.score||0))}
-          ${mkInd(bd.TI?.score,         'TI · CPI 2023',        scoreColor(bd.TI?.score||0))}
+          ${mkInd(bd.TI?.score,         'TI · CPI 2025',        scoreColor(bd.TI?.score||0))}
           ${mkInd(bd.OCDE?.score,       'OCDE · PAI 2017',      scoreColor(bd.OCDE?.score||0))}
         </div>
         <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.68rem">

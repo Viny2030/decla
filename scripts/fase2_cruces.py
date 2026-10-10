@@ -11,6 +11,7 @@ Salidas:
 """
 
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -68,24 +69,47 @@ def descargar_adjudicaciones() -> pd.DataFrame:
     return df
 
 
+_RE_CUIT = re.compile(r"^(20|23|24|27|30|33|34)\d{9}$")
+
+
+def _cuit_valido(v) -> str | None:
+    """Devuelve el CUIT normalizado (11 dígitos) o None.
+
+    Antes se tomaba cualquier valor no vacío de columnas cuyo nombre contenía
+    "cuota", "accion", "sociedad"... En el dataset de la OA esas columnas son
+    MONTOS ("cuota_medico_asistencial", "aportes_sociedades_garantias_reciprocas",
+    con valores "-00", "25200-00") y no hay CUIT de sociedades: se generaban
+    132.750 "alertas" sin CUIL ni nombre de funcionario.
+    """
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    s = re.sub(r"[^0-9]", "", str(v).split(".")[0] if isinstance(v, float) else str(v))
+    return s if _RE_CUIT.match(s) else None
+
+
 def extraer_cuits_sociedades(ddjj: pd.DataFrame) -> pd.DataFrame:
-    cols_soc = [c for c in ddjj.columns if any(
-        k in c for k in ["cuit_soc", "sociedad", "participacion", "accion", "cuota"]
-    )]
-    cuil_col   = _col(ddjj, ["cuil", "cuil_declarante"])
-    nombre_col = _col(ddjj, ["apellido_nombre", "nombre"])
+    cols_soc = [c for c in ddjj.columns if "cuit_soc" in c or c in ("cuit_sociedad", "sociedad_cuit")]
+    cuil_col   = _col(ddjj, ["cuil", "cuil_declarante", "cuit"])
+    nombre_col = _col(ddjj, ["funcionario_apellido_nombre", "apellido_nombre", "nombre"])
+    vacio = pd.DataFrame(columns=["cuil_funcionario", "nombre_funcionario", "cuit_sociedad"])
+    if not cols_soc or not cuil_col:
+        log.warning("  La DDJJ publicada no trae CUIT de sociedades: no hay cruce societario posible")
+        return vacio
 
     registros = []
     for _, row in ddjj.iterrows():
+        cuil = _cuit_valido(row.get(cuil_col))
+        if not cuil:
+            continue
         for col in cols_soc:
-            cuit = row.get(col)
-            if pd.notna(cuit) and str(cuit).strip() not in ("", "nan"):
+            cuit = _cuit_valido(row.get(col))
+            if cuit and cuit != cuil:
                 registros.append({
-                    "cuil_funcionario":   row.get(cuil_col, "") if cuil_col else "",
+                    "cuil_funcionario":   cuil,
                     "nombre_funcionario": row.get(nombre_col, "") if nombre_col else "",
-                    "cuit_sociedad":      str(cuit).strip(),
+                    "cuit_sociedad":      cuit,
                 })
-    return pd.DataFrame(registros)
+    return pd.DataFrame(registros).drop_duplicates() if registros else vacio
 
 
 def cruce1_conflicto_interes(ddjj: pd.DataFrame, adjudicaciones: pd.DataFrame) -> pd.DataFrame:
@@ -130,19 +154,19 @@ def cruce2_puertas_giratorias(ddjj: pd.DataFrame) -> pd.DataFrame:
         recientes = ddjj.copy()
 
     alertas = []
-    for _, row in recientes.iterrows():
-        cuits = extraer_cuits_sociedades(pd.DataFrame([row]))
-        for _, soc in cuits.iterrows():
-            alertas.append({
-                "cuil_funcionario":   soc.get("cuil_funcionario", ""),
-                "nombre_funcionario": soc.get("nombre_funcionario", ""),
-                "cuit_sociedad":      soc.get("cuit_sociedad", ""),
-                "tipo_alerta":        "PUERTA_GIRATORIA_POTENCIAL",
-                "criticidad":         "AMARILLA",
-                "descripcion":        "Funcionario 2023-2024 con participación societaria activa. Verificar en BORA.",
-            })
+    cuits_todos = extraer_cuits_sociedades(recientes)
+    for _, soc in cuits_todos.iterrows():
+        alertas.append({
+            "cuil_funcionario":   soc.get("cuil_funcionario", ""),
+            "nombre_funcionario": soc.get("nombre_funcionario", ""),
+            "cuit_sociedad":      soc.get("cuit_sociedad", ""),
+            "tipo_alerta":        "PUERTA_GIRATORIA_POTENCIAL",
+            "criticidad":         "AMARILLA",
+            "descripcion":        "Funcionario 2023-2024 con participación societaria activa. Verificar en BORA.",
+        })
 
-    df_al = pd.DataFrame(alertas)
+    df_al = pd.DataFrame(alertas, columns=["cuil_funcionario", "nombre_funcionario", "cuit_sociedad",
+                                           "tipo_alerta", "criticidad", "descripcion"])
     df_al.to_csv(PROC_DIR / "alertas_puertas_giratorias.csv", index=False)
     log.info(f"  {len(df_al)} alertas puertas giratorias → alertas_puertas_giratorias.csv")
     return df_al

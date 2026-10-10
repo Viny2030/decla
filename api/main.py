@@ -152,7 +152,7 @@ def resumen():
 
     return {
         "timestamp":               datetime.utcnow().isoformat(),
-        "total_funcionarios":      len(sc),
+        "total_funcionarios":      int(sc["cuit"].nunique()) if "cuit" in sc.columns else len(sc),
         "distribucion_riesgo_f3":  dist_f3,
         "distribucion_internacional": dist_int,
         "alertas_conflicto":       len(c1),
@@ -571,7 +571,7 @@ def contexto_lac():
     return {
         "argentina": {"cpi_ti_2023":38,"wb_cci_percentil":43.8,"fatf_estado":"Lista gris retirada 2023","ocde_miembro":False,"ocde_adherente_pac":True},
         "referencia_lac": {"cpi_promedio_lac":43,"wb_cci_percentil_lac":49.3,"mejor_cpi_lac":{"pais":"Uruguay","cpi":74},"peor_cpi_lac":{"pais":"Venezuela","cpi":13}},
-        "fuentes": {"FATF":"https://www.fatf-gafi.org","WB":"https://info.worldbank.org/governance/wgi/","TI":"https://www.transparency.org/en/cpi/2023","OCDE":"https://www.oecd.org/gov/ethics/"},
+        "fuentes": {"FATF":"https://www.fatf-gafi.org","WB":"https://info.worldbank.org/governance/wgi/","TI":"https://www.transparency.org/en/cpi/2025","OCDE":"https://www.oecd.org/gov/ethics/"},
     }
 
 

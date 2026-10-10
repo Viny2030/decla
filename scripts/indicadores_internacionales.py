@@ -30,6 +30,9 @@ FATF_PEP_CARGOS  = {
     "director nacional", "juez", "fiscal", "gobernador", "intendente",
     "senador", "diputado", "legislador",
 }
+# Referencia fija (no se actualiza sola): verificar contra
+# https://www.fatf-gafi.org/en/topics/high-risk-jurisdictions.html
+# Hoy no influye en el score: los CSV de la OA no informan el país de los bienes (A4 = 0).
 FATF_LISTA_GRIS  = {
     "bulgaria", "camerun", "croacia", "republica del congo",
     "siria", "vietnam", "yemen", "sudafrica",
@@ -40,7 +43,10 @@ WB_AR_PERCENTIL  = 43.8
 WB_LAC_PERCENTIL = 49.3
 WB_BRECHA_UMBRAL = 10.0
 
-TI_AR_CPI        = 38
+# CPI de Transparency International para Argentina: 2023 = 37, 2024 = 37,
+# 2025 = 36 (puesto 104/182, publicado feb-2026). Antes figuraba 38 (valor 2022).
+TI_AR_CPI        = 36
+TI_AR_CPI_ANIO   = 2025
 TI_VELOCIDAD_BM  = 1.2
 TI_SECTORES_RIESGO = {
     "obra publica", "contratos", "licitacion", "concesion",
@@ -461,7 +467,8 @@ def resumen_json(df: pd.DataFrame) -> dict:
             and (df[col + "_bandera"] == "ROJA").sum() > 0
         },
         "contexto": {
-            "ar_cpi_ti_2023":      TI_AR_CPI,
+            "ar_cpi_ti":           TI_AR_CPI,
+            "ar_cpi_ti_anio":      TI_AR_CPI_ANIO,
             "ar_wb_cci_percentil": WB_AR_PERCENTIL,
             "lac_wb_cci_promedio": WB_LAC_PERCENTIL,
             "ocde_umbral_acum":    f"{OCDE_UMBRAL_ACUM}× ingreso/año",
@@ -470,7 +477,7 @@ def resumen_json(df: pd.DataFrame) -> dict:
             "fuentes": {
                 "FATF": "https://www.fatf-gafi.org/en/topics/high-risk-jurisdictions.html",
                 "WB":   "https://info.worldbank.org/governance/wgi/",
-                "TI":   "https://www.transparency.org/en/cpi/2023",
+                "TI":   "https://www.transparency.org/en/cpi/2025",
                 "OCDE": "https://www.oecd.org/gov/ethics/recommendation-public-integrity/",
             },
         },
