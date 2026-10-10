@@ -631,8 +631,8 @@
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
             El <strong style="color:#c8d0e0">score de riesgo</strong> (0–100) suma tres dimensiones:
             IVPI (ROJA 45 pts · AMARILLA 20), opacidad (30 pts) y fuga (25 pts).
-            <strong style="color:#c8d0e0">Hoy sólo el IVPI tiene datos</strong>: el CSV consolidado de la OA no separa efectivo
-            ni bienes en el exterior, así que opacidad y fuga figuran como "sin datos" y el score máximo posible es 45 (ALTO).
+            Efectivo y bienes en el exterior se toman del detalle de bienes de la OA (renglones al cierre del año);
+            sólo se evalúan con patrimonios de al menos USD 10.000.
             <br><br>
             <span style="color:#e63946">■ CRÍTICO</span> ≥70 &nbsp;
             <span style="color:#ff6b35">■ ALTO</span> ≥45 &nbsp;
@@ -662,7 +662,7 @@
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
             Mide qué proporción del patrimonio está en efectivo. Bandera roja cuando el efectivo supera el
             <strong style="color:#c8d0e0">50%</strong> del total declarado — puede indicar dificultad para trazar el origen de los fondos.
-            <br><span style="color:#5a6480;font-size:.7rem">Sin datos por ahora: el CSV de la OA no informa el efectivo por separado.</span>
+
           </p>
         </div>
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
@@ -670,7 +670,7 @@
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
             Mide la proporción de activos declarados en el exterior. Bandera roja cuando superan el
             <strong style="color:#c8d0e0">20%</strong> del patrimonio total.
-            <br><span style="color:#5a6480;font-size:.7rem">Sin datos por ahora: el CSV de la OA no informa los bienes del exterior por separado.</span>
+            <br><span style="color:#5a6480;font-size:.7rem">Tener bienes en el exterior declarados es legal: la bandera sólo prioriza revisión.</span>
           </p>
         </div>
       </div>
@@ -742,7 +742,7 @@
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px;grid-column:1/-1">
           <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⚠️ Limitaciones conocidas</div>
           <div style="font-size:.72rem;color:#8090b0;line-height:1.6">
-            Contrataciones públicas: sin datos en el período de análisis. Poder Judicial: DDJJ patrimoniales no públicas (solo nómina). Efectivo/jurisdicciones de riesgo (A3, A4) y conflicto/puertas (D2, D3): sin columnas en el CSV público de la OA — el score internacional se renormaliza sobre los indicadores con datos disponibles.
+            Contrataciones públicas: sin datos en el período de análisis. Poder Judicial: DDJJ patrimoniales no públicas (solo nómina). Jurisdicción de los bienes (A4), sociedades (A2) y conflicto/puertas giratorias (D2, D3): el CSV público de la OA no informa país ni CUIT de sociedades. El efectivo (A3) se toma del detalle de bienes — el score internacional se renormaliza sobre los indicadores con datos disponibles.
           </div>
         </div>
       </div>
@@ -858,7 +858,7 @@
       <div style="background:#090d14;border:1px solid #1a3a2a;border-radius:6px;padding:12px 16px;font-size:.72rem;color:#4a6a5a;line-height:1.7">
         📌 <strong style="color:#5a9a7a">Renormalización:</strong>
         A3 (efectivo), A4 (jurisdicciones), D2 (conflicto) y D3 (puertas) tienen score 0 por falta de datos en los CSV públicos de la OA.
-        El score internacional se renormaliza sobre los pesos disponibles (actualmente 50/100) para que el resultado sea comparable.
+        El score internacional se renormaliza sobre los pesos disponibles (actualmente 63/100) para que el resultado sea comparable.
         Fuentes: <a href="https://www.fatf-gafi.org" target="_blank" style="color:#7aaeff">FATF</a> ·
         <a href="https://info.worldbank.org/governance/wgi/" target="_blank" style="color:#7aaeff">WB WGI</a> ·
         <a href="https://www.transparency.org/en/cpi/2025" target="_blank" style="color:#7aaeff">TI CPI</a> ·
@@ -1589,13 +1589,13 @@ function abrirFicha(poder, key) {
 
   // Alertas — usar score_riesgo real
   const alertasMsgs = [];
-  if (score >= 45) {
+  if (score >= 20) {
     if (r.ivpi_bandera === 'ROJA')
       alertasMsgs.push(`IVPI ROJO: incremento patrimonial ${Number(r.ivpi||0).toFixed(2)}× los ingresos declarados`);
     if (r.opacidad_bandera === 'ROJA')
-      alertasMsgs.push('Opacidad: efectivo >50% del patrimonio declarado');
+      alertasMsgs.push(`Opacidad: ${Math.round((r.opacidad_ratio||0)*100)}% de los bienes declarados en efectivo (umbral 50%)`);
     if (r.fuga_bandera === 'ROJA')
-      alertasMsgs.push('Fuga: activos en exterior >20% del patrimonio');
+      alertasMsgs.push(`Bienes en el exterior: ${Math.round((r.fuga_ratio||0)*100)}% del total declarado (umbral 20%). Tenerlos declarados es legal; se marca para revisión`);
     if (!alertasMsgs.length)
       alertasMsgs.push('Score elevado detectado por modelo algorítmico — revisar indicadores');
   }
@@ -1676,6 +1676,14 @@ function abrirFicha(poder, key) {
         <div class="modal-stat-val" style="color:${scoreColor(score)}">${score.toFixed?score.toFixed(1):score} / 100</div>
         <div class="modal-stat-lbl">Score de riesgo algorítmico · IVPI + opacidad + fuga</div>
       </div>
+      <div class="modal-stat">
+        <div class="modal-stat-val">${r.efectivo_usd != null ? fmtUSD(r.efectivo_usd) : '—'}${r.opacidad_ratio != null ? ' <span style="font-size:.7rem">(' + Math.round(r.opacidad_ratio*100) + '%)</span>' : ''}</div>
+        <div class="modal-stat-lbl">Dinero en efectivo al cierre · en <strong>USD</strong> (detalle de bienes OA)</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-val">${r.exterior_usd != null ? fmtUSD(r.exterior_usd) : '—'}${r.fuga_ratio != null ? ' <span style="font-size:.7rem">(' + Math.round(r.fuga_ratio*100) + '%)</span>' : ''}</div>
+        <div class="modal-stat-lbl">Bienes en el exterior al cierre · en <strong>USD</strong> (detalle de bienes OA)</div>
+      </div>
     </div>
 
     <div id="hist-chart-container" style="margin:14px 0">
@@ -1692,7 +1700,7 @@ function abrirFicha(poder, key) {
       Los valores en USD se calculan usando el <strong style="color:#6a9a70">TC oficial BNA de fin de diciembre del año declarado</strong>
       (2022: $177 · 2023: $808 · 2024: $1.045) — igual metodología que Chequeado y La Nación Data.
       El IVPI mide cuántas veces el incremento patrimonial supera los ingresos declarados — no implica ilicitud.
-      Opacidad y fuga aparecen como SIN_DATOS cuando el CSV público no incluye esas columnas.
+      Efectivo y exterior salen del detalle de bienes de la OA; con patrimonios menores a USD 10.000 figuran como SIN_DATOS.
     </div>
   `;
 

@@ -116,29 +116,54 @@ def deduplicar(df):
     return df
 
 
-def calcular_opacidad(df):
-    ce = _col(df, ["efectivo","dinero_en_efectivo","ef"])
-    cp = _col(df, ["pn_actual","total_bienes_final","patrimonio_neto_usd","patrimonio_neto"])
-    if not (ce and cp):
-        df["opacidad_ratio"] = float("nan"); df["opacidad_bandera"] = "SIN_DATOS"; return df
-    ef = pd.to_numeric(df[ce], errors="coerce").fillna(0)
-    pt = pd.to_numeric(df[cp], errors="coerce").replace(0, float("nan"))
-    df["opacidad_ratio"]   = (ef / pt).round(3)
-    df["opacidad_bandera"] = df["opacidad_ratio"].apply(lambda v: "ROJA" if pd.notna(v) and v > UMBRAL_EFECTIVO_ROJO else "VERDE" if pd.notna(v) else "SIN_DATOS")
-    log.info(f"Opacidad: {(df['opacidad_bandera']=='ROJA').sum()} con >50% efectivo")
+BIENES_MIN_USD = 10000.0   # patrimonios menores: el % de efectivo/exterior no es significativo
+
+
+def _composicion_bienes():
+    """Efectivo y bienes en el exterior al CIERRE, por dj_id, desde el detalle
+    de bienes de la OA (ddjj_bienes.csv). El total del cierre coincide con
+    total_bienes_final en el 98 % de las DDJJ (importes ya a la parte del titular)."""
+    b = _cargar("ddjj_bienes.csv")
+    if b.empty or "periodo_inicio_cierre" not in b.columns or "dj_id" not in b.columns:
+        return None
+    b = b[b["periodo_inicio_cierre"].astype(str).str.strip().str.upper() == "C"]
+    if b.empty:
+        log.warning("ddjj_bienes.csv sin renglones de cierre (correr fase 1)")
+        return None
+    imp  = pd.to_numeric(b["bien_importe"], errors="coerce").fillna(0)
+    tipo = b["bien_tipo"].astype(str).str.upper()
+    g = pd.DataFrame({
+        "dj_id":    pd.to_numeric(b["dj_id"], errors="coerce"),
+        "bienes_c": imp,
+        "efectivo": imp.where(tipo.str.contains("EFECTIVO"), 0),
+        "exterior": imp.where(tipo.str.contains("EXTERIOR"), 0),
+    }).groupby("dj_id").sum()
+    return g
+
+
+def calcular_opacidad_fuga(df):
+    comp = _composicion_bienes() if "dj_id" in df.columns else None
+    if comp is None:
+        for k in ("opacidad", "fuga"):
+            df[k + "_ratio"] = float("nan"); df[k + "_bandera"] = "SIN_DATOS"
+        log.warning("Opacidad/fuga: sin detalle de bienes → SIN_DATOS")
+        return df
+    m = pd.to_numeric(df["dj_id"], errors="coerce").map
+    total = m(comp["bienes_c"])
+    df["efectivo_usd"] = (m(comp["efectivo"]) / _tc_act(df["anio"])).round(2)
+    df["exterior_usd"] = (m(comp["exterior"]) / _tc_act(df["anio"])).round(2)
+    valido = total.notna() & (total / _tc_act(df["anio"]) >= BIENES_MIN_USD)
+    df["opacidad_ratio"] = (m(comp["efectivo"]) / total).where(valido).round(3)
+    df["fuga_ratio"]     = (m(comp["exterior"]) / total).where(valido).round(3)
+    df["opacidad_bandera"] = np.where(~valido, "SIN_DATOS",
+                             np.where(df["opacidad_ratio"] > UMBRAL_EFECTIVO_ROJO, "ROJA", "VERDE"))
+    df["fuga_bandera"]     = np.where(~valido, "SIN_DATOS",
+                             np.where(df["fuga_ratio"] > UMBRAL_OFFSHORE_ROJO, "ROJA", "VERDE"))
+    log.info(f"Opacidad: {(df['opacidad_bandera']=='ROJA').sum()} con >50% en efectivo · "
+             f"Fuga: {(df['fuga_bandera']=='ROJA').sum()} con >20% en el exterior "
+             f"(patrimonios >= USD {BIENES_MIN_USD:,.0f})")
     return df
 
-def calcular_fuga(df):
-    cx = _col(df, ["activos_exterior","offshore","exterior"])
-    cp = _col(df, ["pn_actual","total_bienes_final","patrimonio_neto_usd"])
-    if not (cx and cp):
-        df["fuga_ratio"] = float("nan"); df["fuga_bandera"] = "SIN_DATOS"; return df
-    ext = pd.to_numeric(df[cx], errors="coerce").fillna(0)
-    pt  = pd.to_numeric(df[cp], errors="coerce").replace(0, float("nan"))
-    df["fuga_ratio"]   = (ext / pt).round(3)
-    df["fuga_bandera"] = df["fuga_ratio"].apply(lambda v: "ROJA" if pd.notna(v) and v > UMBRAL_OFFSHORE_ROJO else "VERDE" if pd.notna(v) else "SIN_DATOS")
-    log.info(f"Fuga: {(df['fuga_bandera']=='ROJA').sum()} con >20% offshore")
-    return df
 
 def calcular_score(df):
     def score(row):
@@ -159,10 +184,9 @@ def run_scoring():
         log.error("Sin datos. Corre fase1_etl.py primero."); return pd.DataFrame()
     df = deduplicar(df)
     df = calcular_ivpi(df)
-    df = calcular_opacidad(df)
-    df = calcular_fuga(df)
+    df = calcular_opacidad_fuga(df)
     df = calcular_score(df)
-    cols = [c for c in ["cuit","funcionario_apellido_nombre","organismo","cargo","poder","sector","anio","desde","total_bienes_inicio","total_bienes_final","total_ingreso_neto_c1234","ingresos_neto_gastos","tipo_declaracion_jurada_descripcion","pn_actual","pn_ant","ingresos","delta_pn","ajustes_valuacion_herencia_usd","tc_conversion_usd","tc_ant_usd","ivpi","ivpi_bandera","ivpi_motivo","opacidad_ratio","opacidad_bandera","fuga_ratio","fuga_bandera","score_riesgo","nivel_riesgo"] if c in df.columns]
+    cols = [c for c in ["dj_id","cuit","funcionario_apellido_nombre","organismo","cargo","poder","sector","anio","desde","total_bienes_inicio","total_bienes_final","total_ingreso_neto_c1234","ingresos_neto_gastos","tipo_declaracion_jurada_descripcion","pn_actual","pn_ant","ingresos","delta_pn","ajustes_valuacion_herencia_usd","tc_conversion_usd","tc_ant_usd","ivpi","ivpi_bandera","ivpi_motivo","efectivo_usd","exterior_usd","opacidad_ratio","opacidad_bandera","fuga_ratio","fuga_bandera","score_riesgo","nivel_riesgo"] if c in df.columns]
     salida = df[cols].sort_values("score_riesgo", ascending=False)
     salida.to_csv(PROC_DIR / "scoring_riesgo.csv", index=False)
     for n in ["CRÍTICO","ALTO","MEDIO","BAJO"]:

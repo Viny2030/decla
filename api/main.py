@@ -51,6 +51,7 @@ _POR_PODER_COLS = [
     "total_bienes_inicio", "total_bienes_final", "pn_actual", "pn_ant",
     "ingresos", "delta_pn", "tc_conversion_usd", "ivpi", "ivpi_bandera",
     "opacidad_bandera", "fuga_bandera", "score_riesgo", "nivel_riesgo",
+    "opacidad_ratio", "fuga_ratio", "efectivo_usd", "exterior_usd", "ivpi_motivo",
 ]
 
 

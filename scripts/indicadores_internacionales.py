@@ -133,8 +133,15 @@ def a2_beneficial_ow(df: pd.DataFrame) -> pd.Series:
 
 
 def a3_cash_ratio(df: pd.DataFrame) -> pd.Series:
-    # efectivo no está en el CSV público — usar proxy: bienes_inicio vs bienes_final
-    # Si no hay columna de efectivo, skip (devuelve 0 — correcto, no tenemos el dato)
+    # Desde el lote 2 la fase 3 calcula opacidad_ratio = efectivo / bienes al
+    # cierre, con el detalle de bienes de la OA (NaN si patrimonio < USD 10.000).
+    if "opacidad_ratio" in df.columns:
+        ratio = pd.to_numeric(df["opacidad_ratio"], errors="coerce").fillna(0)
+        return pd.Series(np.where(
+            ratio > FATF_CASH_UMBRAL,
+            np.minimum(40, (ratio - FATF_CASH_UMBRAL) * 100),
+            0,
+        ).astype(float), index=df.index)
     c_ef = _col(df, ["efectivo", "dinero_en_efectivo", "ef"])
     # FIX: columnas reales del scoring
     c_pt = _col(df, ["pn_actual", "total_bienes_final_usd", "patrimonio_neto_usd", "total_bienes_final"])
@@ -245,19 +252,20 @@ def c2_sector(df: pd.DataFrame) -> pd.Series:
 # ── Grupo D — OCDE ────────────────────────────────────────────────────────
 
 def d1_completitud(df: pd.DataFrame) -> pd.Series:
-    campos = [c for c in OCDE_CAMPOS_OBLIG if any(
-        c.replace("_", "") in col.replace("_", "") for col in df.columns
-    )]
-    if not campos:
+    # Se busca la columna REAL que corresponde a cada campo (antes se buscaba el
+    # nombre genérico en la fila → siempre NaN → todos "incompletos" en cuanto
+    # aparecía una columna parecida, p. ej. efectivo_usd). Faltante = vacío;
+    # un 0 declarado (sin efectivo, sin deudas) es un dato válido.
+    cols = {}
+    for campo in OCDE_CAMPOS_OBLIG:
+        for col in df.columns:
+            if campo.replace("_", "") in col.replace("_", ""):
+                cols[campo] = col
+                break
+    if not cols:
         return pd.Series(0, index=df.index)
-    scores = []
-    for _, row in df.iterrows():
-        faltantes = sum(
-            1 for campo in campos
-            if pd.isna(row.get(campo)) or str(row.get(campo, "")).strip() in ("", "0", "nan")
-        )
-        scores.append(min(25, int(faltantes / len(campos) * 50)))
-    return pd.Series(scores, index=df.index)
+    falt = sum(df[c].isna() | (df[c].astype(str).str.strip().isin(["", "nan"])) for c in cols.values())
+    return (falt / len(cols) * 50).astype(int).clip(upper=25)
 
 
 def d2_conflicto(df: pd.DataFrame) -> pd.Series:

@@ -133,7 +133,7 @@ def normalizar_cuil(valor) -> str | None:
     return s if s else None
 
 
-def limpiar_df(df: pd.DataFrame) -> pd.DataFrame:
+def limpiar_df(df: pd.DataFrame, dedup: bool = True) -> pd.DataFrame:
     if df.empty:
         return df
     df.columns = (
@@ -148,13 +148,34 @@ def limpiar_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     for col in [c for c in df.columns if "cuil" in c or "cuit" in c]:
         df[col] = df[col].apply(normalizar_cuil)
-    for col in [c for c in df.columns if "fecha" in c or "periodo" in c]:
+    # "periodo_inicio_cierre" vale "I" (inicio) o "C" (cierre): NO es una fecha.
+    # Antes se convertía a fecha (todo NaN) y el drop_duplicates de abajo borraba
+    # bienes iguales al inicio y al cierre (~100.000 renglones del detalle).
+    for col in [c for c in df.columns if ("fecha" in c or "periodo" in c) and c != "periodo_inicio_cierre"]:
         df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+    if not dedup:
+        return df
     antes = len(df)
     df.drop_duplicates(inplace=True)
     if antes - len(df) > 0:
         log.info(f"  Duplicados eliminados: {antes - len(df)}")
     return df
+
+
+def quitar_copias_corruptas(df: pd.DataFrame) -> pd.DataFrame:
+    """El consolidado 2024 de la OA trae 4.278 DDJJ dos veces: una con montos en
+    formato OA ("19875315-00") y otra copia con punto decimal ("198753150.00")
+    en la que todo monto terminado en "-00" quedó MULTIPLICADO POR 10.
+    Verificado contra el detalle de bienes (la suma coincide con la copia OA).
+    Si un dj_id aparece en los dos formatos, se descarta la copia con punto."""
+    if df.empty or "dj_id" not in df.columns or "total_bienes_final" not in df.columns:
+        return df
+    es_oa = df["total_bienes_final"].astype(str).str.strip().str.match(r"^-?\d*-\d+$", na=False)
+    con_oa = set(df.loc[es_oa, "dj_id"])
+    corrupta = ~es_oa & df["dj_id"].isin(con_oa)
+    if corrupta.any():
+        log.info(f"  Copias con montos x10 descartadas: {int(corrupta.sum())} (dj_id repetido en formato OA)")
+    return df[~corrupta].reset_index(drop=True)
 
 
 def deflactar(df: pd.DataFrame, tc: float) -> pd.DataFrame:
@@ -257,9 +278,10 @@ def run_etl() -> pd.DataFrame:
     dfs = descargar_fuentes()
     tc  = obtener_tipo_cambio()
 
-    ddjj   = limpiar_df(dfs.get("ddjj_anuales", pd.DataFrame()))
-    bienes = limpiar_df(dfs.get("ddjj_bienes",  pd.DataFrame()))
-    deudas = limpiar_df(dfs.get("ddjj_deudas",  pd.DataFrame()))
+    ddjj   = quitar_copias_corruptas(limpiar_df(dfs.get("ddjj_anuales", pd.DataFrame())))
+    # Detalle renglón por renglón: dos cajas de ahorro con el mismo saldo son dos bienes.
+    bienes = limpiar_df(dfs.get("ddjj_bienes",  pd.DataFrame()), dedup=False)
+    deudas = limpiar_df(dfs.get("ddjj_deudas",  pd.DataFrame()), dedup=False)
 
     if not ddjj.empty:
         ddjj = deflactar(ddjj, tc)
