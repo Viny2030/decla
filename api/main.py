@@ -583,13 +583,20 @@ def run_pipeline_endpoint(
     fases: list[int] = [1, 2, 3, 4],
     x_pipeline_token: Optional[str] = Header(None),
 ):
-    token = os.getenv("PIPELINE_TOKEN", "dev-token")
-    if x_pipeline_token != token:
+    # Sin PIPELINE_TOKEN configurado en Railway el endpoint queda deshabilitado
+    # (antes aceptaba la clave por defecto "dev-token": cualquiera podía lanzar
+    # el pipeline completo y dejar la API ocupada hasta 10 minutos).
+    import hmac
+    token = os.getenv("PIPELINE_TOKEN", "")
+    if not token:
+        raise HTTPException(503, "Endpoint deshabilitado: falta PIPELINE_TOKEN")
+    if not x_pipeline_token or not hmac.compare_digest(x_pipeline_token, token):
         raise HTTPException(401, "Token inválido")
     import subprocess, sys
     cmd = [sys.executable, str(BASE_DIR / "pipeline.py"), "--fase"] + [str(f) for f in fases]
-    proc = subprocess.Popen(cmd, capture_output=True, text=True, cwd=str(BASE_DIR))
-    stdout, stderr = proc.communicate(timeout=600)
+    # Popen no acepta capture_output (daba TypeError → 500 siempre)
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(BASE_DIR), timeout=600)
+    stdout, stderr = proc.stdout, proc.stderr
     return {"status": "ok" if proc.returncode == 0 else "error", "returncode": proc.returncode, "stdout": stdout[-3000:], "stderr": stderr[-1000:] if stderr else None}
 
 
