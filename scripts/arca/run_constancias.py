@@ -45,7 +45,18 @@ log = logging.getLogger(__name__)
 BASE_DIR  = Path(__file__).resolve().parent.parent.parent
 PROC_DIR  = BASE_DIR / "data" / "processed"
 INPUT_CSV = PROC_DIR / "sujetos_obligados_clean.csv"
-OUT_CSV   = PROC_DIR / "constancias_arca.csv"
+OUT_CSV   = PROC_DIR / "constancias_arca.csv"          # completo: NO se sube al repo (domicilio, fecha de nacimiento)
+PUBLICO_CSV = PROC_DIR / "constancias_arca_publico.csv"  # subconjunto sin datos personales: es el que se publica
+
+# Columnas que se publican (lo mismo que ya devuelve /api/constancias/{cuit},
+# sin domicilio fiscal ni fecha de nacimiento)
+COLS_PUBLICAS = ["cuit", "arca_estado_cuit", "arca_tipo_persona", "arca_actividad_ppal",
+                 "arca_provincia", "arca_fecha_consulta"]
+
+# Tope por corrida: con ~53.000 CUIT y 0,3 s de pausa, una consulta completa
+# supera el límite de 6 h de GitHub Actions y, como sólo se guardaba al final,
+# no quedaba nada. Con tope + caché de Actions avanza por tandas.
+MAX_POR_CORRIDA = int(os.getenv("ARCA_MAX_POR_CORRIDA", "8000"))
 
 PAUSA = 0.3  # segundos entre consultas
 
@@ -232,6 +243,15 @@ def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.
     return pd.DataFrame(resultados)
 
 
+def guardar_publico(df: pd.DataFrame) -> None:
+    if df is None or df.empty:
+        return
+    pub = df.reindex(columns=COLS_PUBLICAS)
+    pub["cuit"] = pub["cuit"].map(_norm_cuit)
+    pub.to_csv(PUBLICO_CSV, index=False)
+    log.info(f"Publicable: {PUBLICO_CSV.name} ({len(pub)} filas, sin domicilio ni fecha de nacimiento)")
+
+
 def main():
     if not INPUT_CSV.exists():
         log.error(f"No existe {INPUT_CSV} — corré primero la Fase 1 del pipeline")
@@ -250,10 +270,11 @@ def main():
     log.info(f"  Excluidos (error x{MAX_INTENTOS_ERROR}+): {len(clasif['excluidos_error'])}")
     log.info(f"{'='*50}")
 
-    a_consultar = clasif["nuevos"] + clasif["refresh"] + clasif["retry_error"]
+    a_consultar = (clasif["nuevos"] + clasif["retry_error"] + clasif["refresh"])[:MAX_POR_CORRIDA]
 
     if not a_consultar:
         log.info("Nada para consultar — constancias_arca.csv ya está al día.")
+        guardar_publico(cache.drop(columns=["_cuit_norm"], errors="ignore"))
         return
 
     prod    = os.getenv("ARCA_PROD", "0") == "1"
@@ -273,6 +294,7 @@ def main():
         df_out = df_nuevos
 
     df_out.to_csv(OUT_CSV, index=False)
+    guardar_publico(df_out)
 
     log.info(f"\n{'='*50}")
     log.info(f"Total en {OUT_CSV.name}: {len(df_out)}")

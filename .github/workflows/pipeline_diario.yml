@@ -66,6 +66,7 @@ jobs:
           git add -f data/processed/perfil_riesgo_completo.csv || true
           git add -f data/processed/indicadores_internacionales.csv || true
           git add -f data/processed/alertas_puertas_giratorias.csv || true
+          git add -f data/processed/alertas_conflicto.csv || true
           git add -f data/processed/tabla_judicial.csv || true
 
           if [ -n "$(git status --porcelain)" ]; then

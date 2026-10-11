@@ -33,3 +33,8 @@ test*.py
 fix_*.py
 find_*.py
 tra_test.*
+
+# Certificados y claves de ARCA: van en los secrets, nunca en el repo
+*.crt
+*.key
+*.pem

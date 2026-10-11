@@ -11,6 +11,7 @@ permissions:
 jobs:
   constancias:
     runs-on: ubuntu-latest
+    timeout-minutes: 300
 
     env:
       ARCA_CERT: ${{ secrets.ARCA_CERT }}
@@ -38,15 +39,31 @@ jobs:
       - name: Crear directorios
         run: mkdir -p data/raw data/processed
 
+      # El archivo completo (con domicilio y fecha de nacimiento) NO se sube al
+      # repo: se guarda en la caché de Actions para no reconsultar todo cada día.
+      - name: Restaurar caché de constancias
+        uses: actions/cache/restore@v4
+        with:
+          path: data/processed/constancias_arca.csv
+          key: constancias-arca-${{ github.run_id }}
+          restore-keys: constancias-arca-
+
       - name: Consultar constancias ARCA
         run: python scripts/arca/run_constancias.py
+
+      - name: Guardar caché de constancias
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/processed/constancias_arca.csv
+          key: constancias-arca-${{ github.run_id }}
 
       - name: Commit resultados
         run: |
           git config --global user.name  'Robot Monitor DDJJ'
           git config --global user.email 'robot-ddjj@noreply.github.com'
 
-          git add data/processed/constancias_arca.csv || true
+          git add -f data/processed/constancias_arca_publico.csv || true
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "ARCA constancias $(date +'%Y-%m-%d') — inscripcion actualizada"

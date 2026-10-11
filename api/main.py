@@ -419,7 +419,11 @@ def constancia_cuit(cuit: str):
     encontrado = False
 
     # 1) Constancia ARCA (padrón A13)
-    df_const = _csv("constancias_arca.csv")
+    # El repo publica sólo constancias_arca_publico.csv (sin datos personales);
+    # el completo existe únicamente en un entorno local.
+    df_const = _csv("constancias_arca_publico.csv")
+    if df_const.empty:
+        df_const = _csv("constancias_arca.csv")
     if not df_const.empty:
         c_cuit = _col(df_const, ["cuit", "cuil"])
         if c_cuit:
@@ -570,8 +574,10 @@ def indicadores_funcionario(cuil: str):
 @app.get("/api/indicadores/contexto-lac")
 def contexto_lac():
     return {
-        "argentina": {"cpi_ti_2023":38,"wb_cci_percentil":43.8,"fatf_estado":"Lista gris retirada 2023","ocde_miembro":False,"ocde_adherente_pac":True},
-        "referencia_lac": {"cpi_promedio_lac":43,"wb_cci_percentil_lac":49.3,"mejor_cpi_lac":{"pais":"Uruguay","cpi":74},"peor_cpi_lac":{"pais":"Venezuela","cpi":13}},
+        # CPI 2025 (Transparency International, feb-2026): Argentina 36; promedio Américas 42;
+        # mejor de América Latina Uruguay 73; peor Venezuela 10.
+        "argentina": {"cpi_ti":36,"cpi_ti_anio":2025,"wb_cci_percentil":43.8,"fatf_estado":"No integra la lista gris del GAFI (salió en 2014)","ocde_miembro":False,"ocde_adherente_pac":True},
+        "referencia_lac": {"cpi_promedio_americas":42,"wb_cci_percentil_lac":49.3,"mejor_cpi_lac":{"pais":"Uruguay","cpi":73},"peor_cpi_lac":{"pais":"Venezuela","cpi":10}},
         "fuentes": {"FATF":"https://www.fatf-gafi.org","WB":"https://info.worldbank.org/governance/wgi/","TI":"https://www.transparency.org/en/cpi/2025","OCDE":"https://www.oecd.org/gov/ethics/"},
     }
 

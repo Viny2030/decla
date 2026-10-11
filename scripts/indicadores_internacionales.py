@@ -30,14 +30,10 @@ FATF_PEP_CARGOS  = {
     "director nacional", "juez", "fiscal", "gobernador", "intendente",
     "senador", "diputado", "legislador",
 }
-# Referencia fija (no se actualiza sola): verificar contra
-# https://www.fatf-gafi.org/en/topics/high-risk-jurisdictions.html
-# Hoy no influye en el score: los CSV de la OA no informan el país de los bienes (A4 = 0).
-FATF_LISTA_GRIS  = {
-    "bulgaria", "camerun", "croacia", "republica del congo",
-    "siria", "vietnam", "yemen", "sudafrica",
-}
-FATF_LISTA_NEGRA = {"corea del norte", "iran", "myanmar"}
+try:
+    from scripts.listas_gafi import LISTA_GRIS as FATF_LISTA_GRIS, LISTA_NEGRA as FATF_LISTA_NEGRA, LISTAS_FECHA
+except ImportError:
+    from listas_gafi import LISTA_GRIS as FATF_LISTA_GRIS, LISTA_NEGRA as FATF_LISTA_NEGRA, LISTAS_FECHA
 
 WB_AR_PERCENTIL  = 43.8
 WB_LAC_PERCENTIL = 49.3
@@ -98,6 +94,16 @@ def _cargar(nombre: str) -> pd.DataFrame:
     return pd.read_csv(p, low_memory=False) if p.exists() else pd.DataFrame()
 
 
+def _cuit(v) -> str:
+    """CUIT/CUIL como 11 dígitos (el scoring lo trae como float '20297687728.0')."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    t = str(v).strip()
+    if t.endswith(".0"):
+        t = t[:-2]
+    return "".join(ch for ch in t if ch.isdigit())
+
+
 def _bandera(score: float) -> str:
     if score >= 70: return "ROJA"
     if score >= 40: return "NARANJA"
@@ -118,17 +124,15 @@ def a1_pep(df: pd.DataFrame) -> pd.Series:
 
 
 def a2_beneficial_ow(df: pd.DataFrame) -> pd.Series:
-    col_soc = _col(df, ["cuit_sociedad", "participacion_societaria", "sociedad"])
-    col_jur = _col(df, ["pais_sociedad", "jurisdiccion", "pais"])
-    scores  = pd.Series(0, index=df.index)
-    if col_soc:
-        tiene = df[col_soc].notna() & (df[col_soc].astype(str).str.strip() != "")
+    """Participaciones en sociedades no cotizantes o empresas propias declaradas
+    en el detalle de bienes (fase 3): 20 pts; 35 si además tiene bienes en una
+    jurisdicción de la lista gris/negra del GAFI."""
+    scores = pd.Series(0, index=df.index)
+    if "n_participaciones" in df.columns:
+        tiene = pd.to_numeric(df["n_participaciones"], errors="coerce").fillna(0) > 0
         scores[tiene] = 20
-    if col_jur:
-        offshore = df[col_jur].astype(str).str.lower().apply(
-            lambda v: any(j in v for j in FATF_LISTA_NEGRA | FATF_LISTA_GRIS)
-        )
-        scores[offshore] = 35
+        if "jurisdiccion_riesgo" in df.columns:
+            scores[tiene & df["jurisdiccion_riesgo"].fillna("").isin(["GRIS", "NEGRA"])] = 35
     return scores
 
 
@@ -158,16 +162,11 @@ def a3_cash_ratio(df: pd.DataFrame) -> pd.Series:
 
 
 def a4_jurisdiccion(df: pd.DataFrame) -> pd.Series:
-    col = _col(df, ["pais_activo", "jurisdiccion", "activos_exterior", "pais_sociedad"])
-    if not col:
+    """Bienes en países de la lista negra (40) o gris (20) del GAFI. El país sale
+    de la descripción de cada bien del exterior ("-País: ...") en fase 3."""
+    if "jurisdiccion_riesgo" not in df.columns:
         return pd.Series(0, index=df.index)
-    def s(v):
-        if pd.isna(v): return 0
-        v = str(v).lower()
-        if any(j in v for j in FATF_LISTA_NEGRA): return 40
-        if any(j in v for j in FATF_LISTA_GRIS):  return 20
-        return 0
-    return df[col].apply(s)
+    return df["jurisdiccion_riesgo"].fillna("").map({"NEGRA": 40, "GRIS": 20}).fillna(0).astype(int)
 
 
 # ── Grupo B — World Bank ──────────────────────────────────────────────────
@@ -271,39 +270,25 @@ def d1_completitud(df: pd.DataFrame) -> pd.Series:
 def d2_conflicto(df: pd.DataFrame) -> pd.Series:
     alertas = _cargar("alertas_conflicto.csv")
     scores  = pd.Series(0, index=df.index)
-    if alertas.empty:
-        return scores
     cuil_df = _col(df, ["cuil", "cuil_declarante", "cuit"])
-    cuil_al = _col(alertas, ["cuil_funcionario"])
-    if not (cuil_df and cuil_al):
+    if alertas.empty or not cuil_df or "cuil_funcionario" not in alertas.columns:
         return scores
-    cuils_r = set(
-        alertas[alertas.get("criticidad", pd.Series("")).eq("ROJA")][cuil_al]
-        .astype(str).str.replace("-", "")
-    )
-    cuils_a = set(alertas[cuil_al].astype(str).str.replace("-", "")) - cuils_r
-    for idx, row in df.iterrows():
-        c = str(row.get(cuil_df, "")).replace("-", "")
-        if c in cuils_r:   scores[idx] = 40
-        elif c in cuils_a: scores[idx] = 20
+    al = alertas.assign(c=alertas["cuil_funcionario"].map(_cuit))
+    rojas = set(al.loc[al.get("criticidad", pd.Series("", index=al.index)).eq("ROJA"), "c"])
+    resto = set(al["c"]) - rojas
+    c = df[cuil_df].map(_cuit)
+    scores[c.isin(resto)] = 20
+    scores[c.isin(rojas)] = 40
     return scores
 
 
 def d3_puerta_giratoria(df: pd.DataFrame) -> pd.Series:
     alertas = _cargar("alertas_puertas_giratorias.csv")
-    scores  = pd.Series(0, index=df.index)
-    if alertas.empty:
-        return scores
     cuil_df = _col(df, ["cuil", "cuil_declarante", "cuit"])
-    cuil_pg = _col(alertas, ["cuil_funcionario"])
-    if not (cuil_df and cuil_pg):
-        return scores
-    cuils = set(alertas[cuil_pg].astype(str).str.replace("-", ""))
-    for idx, row in df.iterrows():
-        c = str(row.get(cuil_df, "")).replace("-", "")
-        if c in cuils:
-            scores[idx] = 30
-    return scores
+    if alertas.empty or not cuil_df or "cuil_funcionario" not in alertas.columns:
+        return pd.Series(0, index=df.index)
+    cuils = set(alertas["cuil_funcionario"].map(_cuit)) - {""}
+    return pd.Series(np.where(df[cuil_df].map(_cuit).isin(cuils), 30, 0), index=df.index)
 
 
 def d4_evolucion_ocde(df: pd.DataFrame) -> pd.Series:
@@ -481,6 +466,7 @@ def resumen_json(df: pd.DataFrame) -> dict:
             "lac_wb_cci_promedio": WB_LAC_PERCENTIL,
             "ocde_umbral_acum":    f"{OCDE_UMBRAL_ACUM}× ingreso/año",
             "fatf_cash_umbral":    f"{int(FATF_CASH_UMBRAL*100)}% del patrimonio",
+            "fatf_listas_fecha":   LISTAS_FECHA,
             "ti_velocidad_bm":     f"{TI_VELOCIDAD_BM}× ingreso/año (CPI<40)",
             "fuentes": {
                 "FATF": "https://www.fatf-gafi.org/en/topics/high-risk-jurisdictions.html",

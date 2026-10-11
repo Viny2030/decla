@@ -742,7 +742,7 @@
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px;grid-column:1/-1">
           <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⚠️ Limitaciones conocidas</div>
           <div style="font-size:.72rem;color:#8090b0;line-height:1.6">
-            Contrataciones públicas: sin datos en el período de análisis. Poder Judicial: DDJJ patrimoniales no públicas (solo nómina). Jurisdicción de los bienes (A4), sociedades (A2) y conflicto/puertas giratorias (D2, D3): el CSV público de la OA no informa país ni CUIT de sociedades. El efectivo (A3) se toma del detalle de bienes — el score internacional se renormaliza sobre los indicadores con datos disponibles.
+            Contrataciones públicas: sin datos en el período de análisis. Poder Judicial: DDJJ patrimoniales no públicas (solo nómina). La DDJJ no informa el CUIT de las sociedades del funcionario, así que no se puede cruzar con adjudicaciones (no hay alertas rojas de conflicto). Efectivo (A3), sociedades (A2) y país de los bienes (A4) salen del detalle de bienes; puertas giratorias (D3), de las DDJJ de actividades anteriores y posteriores (MAPPAP).
           </div>
         </div>
       </div>
@@ -780,7 +780,7 @@
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">A2 · Beneficial Ownership <span style="color:#5a6480;font-weight:400">(peso 7%)</span></div>
-            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Detecta participaciones societarias (R.24/25). Score 20 si tiene sociedades, 35 si están en jurisdicciones de lista gris/negra FATF 2024.</div>
+            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Participaciones en sociedades no cotizantes o empresas propias declaradas en el detalle de bienes (R.24/25). Score 20 si tiene; 35 si además tiene bienes en un país de la lista gris/negra del GAFI.</div>
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">A3 · Cash Ratio &gt;30% <span style="color:#5a6480;font-weight:400">(peso 8%)</span></div>
@@ -788,7 +788,7 @@
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">A4 · Jurisdicciones de riesgo <span style="color:#5a6480;font-weight:400">(peso 7%)</span></div>
-            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Activos en países de lista negra FATF (Corea del Norte, Irán, Myanmar) = 40 pts. Lista gris = 20 pts.</div>
+            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">País de cada bien del exterior según la DDJJ. Lista negra GAFI (Irán, Corea del Norte, Myanmar) = 40 pts; lista gris (22 países, plenario 19-jun-2026, p. ej. Bolivia, Venezuela, Kenia, Islas Vírgenes Británicas) = 20 pts.</div>
           </div>
         </div>
       </div>
@@ -842,11 +842,11 @@
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">D2 · Conflicto de interés <span style="color:#5a6480;font-weight:400">(peso 13%)</span></div>
-            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Cruza con alertas_conflicto.csv (Fase 2). Alerta roja = 40 pts · alerta amarilla = 20 pts.</div>
+            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Alerta amarilla (20 pts) cuando la DDJJ marca "proveedor/contratista: SI": puede ser proveedor del Estado o integrar comisiones de compras/recepción, hay que verificar. Alerta roja (40 pts) sólo si una sociedad suya fuera adjudicataria (hoy sin datos: la DDJJ no trae CUIT de sociedades).</div>
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">D3 · Puerta giratoria <span style="color:#5a6480;font-weight:400">(peso 10%)</span></div>
-            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Paso sector público↔privado en &lt;365 días (alertas_puertas_giratorias.csv). Score 30 si detectado.</div>
+            <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Según sus DDJJ de actividades anteriores y posteriores (MAPPAP, OA): dejó un empleo privado menos de 365 días antes de asumir, lo mantiene mientras ejerce el cargo, o pasó al sector privado menos de 365 días después de dejarlo. Score 30. Se excluyen empleadores públicos y universidades.</div>
           </div>
           <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
             <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">D4 · Evolución patrimonial <span style="color:#5a6480;font-weight:400">(peso 7%)</span></div>
@@ -858,7 +858,7 @@
       <div style="background:#090d14;border:1px solid #1a3a2a;border-radius:6px;padding:12px 16px;font-size:.72rem;color:#4a6a5a;line-height:1.7">
         📌 <strong style="color:#5a9a7a">Renormalización:</strong>
         A3 (efectivo), A4 (jurisdicciones), D2 (conflicto) y D3 (puertas) tienen score 0 por falta de datos en los CSV públicos de la OA.
-        El score internacional se renormaliza sobre los pesos disponibles (actualmente 63/100) para que el resultado sea comparable.
+        Los 12 indicadores tienen datos: el score internacional usa los pesos completos (100/100).
         Fuentes: <a href="https://www.fatf-gafi.org" target="_blank" style="color:#7aaeff">FATF</a> ·
         <a href="https://info.worldbank.org/governance/wgi/" target="_blank" style="color:#7aaeff">WB WGI</a> ·
         <a href="https://www.transparency.org/en/cpi/2025" target="_blank" style="color:#7aaeff">TI CPI</a> ·

@@ -5,8 +5,10 @@ import pandas as pd
 
 try:
     from scripts.utils_oa import parsear_oa_serie
+    from scripts.listas_gafi import riesgo_pais
 except ImportError:
     from utils_oa import parsear_oa_serie
+    from listas_gafi import riesgo_pais
 
 logging.basicConfig(level=logging.INFO, format="[SCORING] %(message)s")
 log = logging.getLogger(__name__)
@@ -132,12 +134,27 @@ def _composicion_bienes():
         return None
     imp  = pd.to_numeric(b["bien_importe"], errors="coerce").fillna(0)
     tipo = b["bien_tipo"].astype(str).str.upper()
+    dj   = pd.to_numeric(b["dj_id"], errors="coerce")
+    # Participaciones en sociedades no cotizantes / empresas propias
+    es_soc = tipo.str.contains("PARTICIPACIONES SOCIALES SIN COTIZACION|PARTICIPACIONES SOCIETARIAS|PATRIMONIO DE EMPRESAS")
     g = pd.DataFrame({
-        "dj_id":    pd.to_numeric(b["dj_id"], errors="coerce"),
+        "dj_id":    dj,
         "bienes_c": imp,
         "efectivo": imp.where(tipo.str.contains("EFECTIVO"), 0),
         "exterior": imp.where(tipo.str.contains("EXTERIOR"), 0),
+        "participaciones": imp.where(es_soc, 0),
+        "n_participaciones": es_soc.astype(int),
     }).groupby("dj_id").sum()
+    # País de los bienes del exterior: la descripción trae "-País: Uruguay -..."
+    ext = tipo.str.contains("EXTERIOR")
+    pais = b.loc[ext, "bien_descripcion"].astype(str).str.extract(r"Pa[ií]s:\s*([^-]+?)\s*(?:-|$)")[0].str.strip()
+    pp = pd.DataFrame({"dj_id": dj[ext], "pais": pais}).dropna()
+    pp = pp[~pp["pais"].str.upper().str.startswith("OTROS")]
+    pp["riesgo"] = pp["pais"].map(riesgo_pais)
+    g["paises_exterior"] = pp.groupby("dj_id")["pais"].agg(lambda x: "; ".join(sorted(set(x))))
+    orden = {"NEGRA": 2, "GRIS": 1, "": 0}
+    g["jurisdiccion_riesgo"] = pp.groupby("dj_id")["riesgo"].agg(lambda x: max(x, key=lambda v: orden[v]))
+    g["paises_riesgo"] = pp[pp["riesgo"] != ""].groupby("dj_id")["pais"].agg(lambda x: "; ".join(sorted(set(x))))
     return g
 
 
@@ -152,6 +169,11 @@ def calcular_opacidad_fuga(df):
     total = m(comp["bienes_c"])
     df["efectivo_usd"] = (m(comp["efectivo"]) / _tc_act(df["anio"])).round(2)
     df["exterior_usd"] = (m(comp["exterior"]) / _tc_act(df["anio"])).round(2)
+    df["participaciones_usd"] = (m(comp["participaciones"]) / _tc_act(df["anio"])).round(2)
+    df["n_participaciones"]   = m(comp["n_participaciones"]).fillna(0).astype(int)
+    df["paises_exterior"]     = m(comp["paises_exterior"]).fillna("")
+    df["jurisdiccion_riesgo"] = m(comp["jurisdiccion_riesgo"]).fillna("")
+    df["paises_riesgo"]       = m(comp["paises_riesgo"]).fillna("")
     valido = total.notna() & (total / _tc_act(df["anio"]) >= BIENES_MIN_USD)
     df["opacidad_ratio"] = (m(comp["efectivo"]) / total).where(valido).round(3)
     df["fuga_ratio"]     = (m(comp["exterior"]) / total).where(valido).round(3)
@@ -186,7 +208,7 @@ def run_scoring():
     df = calcular_ivpi(df)
     df = calcular_opacidad_fuga(df)
     df = calcular_score(df)
-    cols = [c for c in ["dj_id","cuit","funcionario_apellido_nombre","organismo","cargo","poder","sector","anio","desde","total_bienes_inicio","total_bienes_final","total_ingreso_neto_c1234","ingresos_neto_gastos","tipo_declaracion_jurada_descripcion","pn_actual","pn_ant","ingresos","delta_pn","ajustes_valuacion_herencia_usd","tc_conversion_usd","tc_ant_usd","ivpi","ivpi_bandera","ivpi_motivo","efectivo_usd","exterior_usd","opacidad_ratio","opacidad_bandera","fuga_ratio","fuga_bandera","score_riesgo","nivel_riesgo"] if c in df.columns]
+    cols = [c for c in ["dj_id","cuit","funcionario_apellido_nombre","organismo","cargo","poder","sector","anio","desde","total_bienes_inicio","total_bienes_final","total_ingreso_neto_c1234","ingresos_neto_gastos","tipo_declaracion_jurada_descripcion","pn_actual","pn_ant","ingresos","delta_pn","ajustes_valuacion_herencia_usd","tc_conversion_usd","tc_ant_usd","ivpi","ivpi_bandera","ivpi_motivo","efectivo_usd","exterior_usd","participaciones_usd","n_participaciones","paises_exterior","jurisdiccion_riesgo","paises_riesgo","proveedor_contratista","opacidad_ratio","opacidad_bandera","fuga_ratio","fuga_bandera","score_riesgo","nivel_riesgo"] if c in df.columns]
     salida = df[cols].sort_values("score_riesgo", ascending=False)
     salida.to_csv(PROC_DIR / "scoring_riesgo.csv", index=False)
     for n in ["CRÍTICO","ALTO","MEDIO","BAJO"]:
