@@ -105,10 +105,33 @@ def _cuit(v) -> str:
 
 
 def _bandera(score: float) -> str:
+    """score en % del máximo del indicador (0-100)."""
     if score >= 70: return "ROJA"
     if score >= 40: return "NARANJA"
     if score >= 20: return "AMARILLA"
     return "VERDE"
+
+
+# Indicadores de EXPOSICIÓN o de calidad del dato, no de conducta: ocupar un
+# cargo PEP, trabajar en un organismo de sector de riesgo o dejar campos de la
+# DDJJ incompletos no es una señal patrimonial. Su bandera llega como máximo a
+# AMARILLA; ROJA queda para los indicadores de comportamiento.
+BANDERA_TOPE = {"A1_pep": "AMARILLA", "C2_sector": "AMARILLA", "D1_completitud": "AMARILLA"}
+_ORDEN_BANDERA = ["VERDE", "AMARILLA", "NARANJA", "ROJA"]
+
+
+def bandera_indicador(col: str, scores: pd.Series) -> pd.Series:
+    """Bandera sobre el score normalizado al máximo del indicador. Antes se
+    aplicaba el umbral de 70 al score crudo (máximos de 15 a 40), así que
+    ningún indicador podía quedar en ROJA y "alertas_rojas_por_indicador"
+    salía siempre vacío."""
+    pct = scores.clip(0, MAXIMOS[col]) / MAXIMOS[col] * 100
+    b = pct.apply(_bandera)
+    tope = BANDERA_TOPE.get(col)
+    if tope:
+        lim = _ORDEN_BANDERA.index(tope)
+        b = b.map(lambda x: x if _ORDEN_BANDERA.index(x) <= lim else tope)
+    return b
 
 
 # ── Grupo A — FATF ────────────────────────────────────────────────────────
@@ -407,7 +430,7 @@ def run_indicadores() -> pd.DataFrame:
     # Banderas por indicador
     for col in PESOS:
         if col in df.columns:
-            df[col + "_bandera"] = df[col].apply(_bandera)
+            df[col + "_bandera"] = bandera_indicador(col, df[col])
 
     # Columnas de salida
     cols_id    = [c for c in ["cuit", "cuil", "cuil_declarante", "funcionario_apellido_nombre",

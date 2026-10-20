@@ -1824,8 +1824,8 @@ function abrirFicha(poder, key) {
             'D2 Conflicto':  [bd.OCDE?.D2_conflicto?.bandera,   bd.OCDE?.D2_conflicto?.score],
             'D3 P.Giratoria':[bd.OCDE?.D3_puerta?.bandera,      bd.OCDE?.D3_puerta?.score],
           }).map(([k,[bandera, score]]) => {
-            const c = bandera === 'ROJA' ? '#e63946' : bandera === 'AMARILLA' ? '#ffd060' : '#2ec27e';
-            const dot = bandera === 'ROJA' ? '🔴' : bandera === 'AMARILLA' ? '🟡' : '🟢';
+            const c = bandera === 'ROJA' ? '#e63946' : bandera === 'NARANJA' ? '#f4a261' : bandera === 'AMARILLA' ? '#ffd060' : '#2ec27e';
+            const dot = bandera === 'ROJA' ? '🔴' : bandera === 'NARANJA' ? '🟠' : bandera === 'AMARILLA' ? '🟡' : '🟢';
             return `<div style="background:#111520;border:1px solid #1e2535;border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center">
               <span style="color:#7a8aaa">${dot} ${k}</span>
               <span style="color:${c};font-family:var(--mono);font-weight:600">${Number(score||0).toFixed(1)}</span>
