@@ -353,6 +353,17 @@ def run_etl() -> pd.DataFrame:
     if not tabla_judicial.empty:
         tabla_judicial.to_csv(PROC_DIR / "tabla_judicial.csv", index=False)
 
+    # Histórico 2022-2023 para /api/historico (se genera sólo si falta: los
+    # archivos están en el repo y esos cortes de la OA ya no cambian)
+    try:
+        try:
+            from scripts.historico_oa import generar as generar_historico
+        except ImportError:
+            from historico_oa import generar as generar_historico
+        generar_historico()
+    except Exception as e:
+        log.warning(f"Histórico no generado: {e}")
+
     log.info(f"Fase 1 OK — DDJJ normalizadas: {len(ddjj)}")
     return ddjj
 

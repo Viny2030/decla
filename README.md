@@ -138,6 +138,7 @@ uvicorn api.main:app --reload --port 8000
 | GET | `/api/scoring` | Ranking Fase 3 |
 | GET | `/api/alertas` | Alertas Fase 2 |
 | GET | `/api/funcionario/{cuil}` | Perfil |
+| GET | `/api/historico/{cuit}` | Evolución 2022-2023-2024 (`scripts/historico_oa.py`) |
 | GET | `/api/grafo` | Red societaria (sin datos: la DDJJ publicada no trae CUIT de sociedades) |
 | GET | `/api/anomalias` | ML anomalías |
 | GET | `/api/clusters` | Clusters (sin datos, mismo motivo) |

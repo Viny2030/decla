@@ -71,6 +71,7 @@ jobs:
           git add -f data/processed/alertas_conflicto.csv || true
           git add -f data/processed/tabla_judicial.csv || true
           git add -f data/processed/tipo_cambio.csv || true
+          git add -f data/processed/ddjj_2022_norm.csv data/processed/ddjj_2023_norm.csv || true
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Monitor DDJJ $(date +'%Y-%m-%d') — pipeline completo"
