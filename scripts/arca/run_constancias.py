@@ -239,6 +239,15 @@ def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.
             seguidos = 0
             log.info(f"[{i}/{len(a_consultar)}] {original} → {row['arca_nombre']} {row['arca_apellido']} ({row['arca_estado_cuit']})")
         except Exception as e:
+            if "se encuentra INACTIVA" in str(e):
+                # Respuesta válida de ARCA (no un error): la clave está inactiva
+                row = {"cuit": original, "arca_estado_cuit": "INACTIVO", "arca_error": None,
+                       "arca_intentos_error": 0, "arca_fecha_consulta": datetime.now().strftime("%Y-%m-%d")}
+                log.info(f"[{i}/{len(a_consultar)}] {original} → (INACTIVO)")
+                seguidos = 0
+                resultados.append(row)
+                time.sleep(PAUSA)
+                continue
             log.warning(f"[{i}/{len(a_consultar)}] {original} → ERROR: {e}")
             intentos_previos = 0
             if not cache.empty:

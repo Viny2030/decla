@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# Una sola corrida a la vez (dos en paralelo chocaban al subir el mismo CSV)
+concurrency:
+  group: arca-constancias
+  cancel-in-progress: false
+
 jobs:
   constancias:
     runs-on: ubuntu-latest
@@ -68,7 +73,8 @@ jobs:
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "ARCA constancias $(date +'%Y-%m-%d') — inscripcion actualizada"
-            git pull --rebase origin main
+            # -X theirs: si otro commit tocó los mismos CSV, gana lo recién calculado
+            git pull --rebase -X theirs origin main
             git push origin main
           else
             git pull --rebase origin main || true
