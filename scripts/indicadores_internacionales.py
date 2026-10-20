@@ -420,7 +420,11 @@ def run_indicadores() -> pd.DataFrame:
 
     todas = cols_id + cols_f3 + cols_ind + [c + "_bandera" for c in PESOS] + cols_marco + cols_final
     salida = df[[c for c in todas if c in df.columns]].copy()
-    salida.sort_values("score_internacional", ascending=False, inplace=True)
+    # Desempate por CUIT: sin él los empates salían en otro orden cada día y el
+    # commit diario reescribía ~100.000 renglones sin ningún cambio de datos.
+    desempate = [c for c in ("cuit", "cuil", "cuil_declarante") if c in salida.columns][:1]
+    salida.sort_values(["score_internacional"] + desempate, ascending=[False] + [True] * len(desempate),
+                       kind="mergesort", inplace=True)
 
     salida.to_csv(PROC_DIR / "indicadores_internacionales.csv", index=False)
     log.info(f"→ indicadores_internacionales.csv ({len(salida)} registros)")

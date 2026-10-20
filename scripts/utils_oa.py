@@ -42,11 +42,14 @@ def parsear_oa(v):
         pass
     # Formato OA: dígitos-dígitos
     if '-' in s:
-        partes = s.rsplit('-', 1)
+        # El signo inicial se conserva: "-500-25" es -500.25 (antes daba +500.25)
+        negativo = s.startswith('-')
+        partes = s.lstrip('-').rsplit('-', 1)
         entero = partes[0].replace('-', '').replace(',', '')
         decimal = partes[1] if len(partes) > 1 else '0'
         try:
-            return float(f"{entero}.{decimal}")
+            v = float(f"{entero}.{decimal}")
+            return -v if negativo else v
         except ValueError:
             return None
     return None
@@ -73,10 +76,13 @@ def parsear_oa_serie(serie: pd.Series) -> pd.Series:
     # Para lo que no parseó directo, probar el patrón OA "digitos-digitos"
     mask_oa = numerico.isna() & s.str.match(OA_PATTERN, na=False)
     if mask_oa.any():
-        partes  = s[mask_oa].str.rsplit('-', n=1, expand=True)
+        oa      = s[mask_oa]
+        negativo = oa.str.startswith('-')   # "-500-25" = -500.25 (antes se perdía el signo)
+        partes  = oa.str.lstrip('-').str.rsplit('-', n=1, expand=True)
         entero  = partes[0].str.replace('-', '', regex=False).str.replace(',', '', regex=False)
         decimal = partes[1]
-        numerico.loc[mask_oa] = pd.to_numeric(entero + '.' + decimal, errors="coerce")
+        valor   = pd.to_numeric(entero + '.' + decimal, errors="coerce")
+        numerico.loc[mask_oa] = valor.where(~negativo, -valor)
 
     # "-0.00" (cero negativo) = placeholder OA "no informado" -> NaN
     neg_zero = (numerico == 0) & np.signbit(numerico.to_numpy(dtype="float64"))

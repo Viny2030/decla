@@ -41,13 +41,27 @@ monitor_ddjj/
 
 | Fase | Script | Salida |
 |------|--------|--------|
-| 1 — ETL | `fase1_etl.py` | `ddjj_normalizada.csv`, `sujetos_obligados_clean.csv` |
+| 1 — ETL | `fase1_etl.py` | `ddjj_normalizada.csv`, `sujetos_obligados_clean.csv`, `tipo_cambio.csv` |
 | 2 — Cruces | `fase2_cruces.py` | `alertas_conflicto.csv`, `alertas_puertas_giratorias.csv` |
 | 3 — Scoring | `fase3_scoring.py` | `scoring_riesgo.csv` |
 | 4 — ML | `fase4_ml.py` | `anomalias_ml.csv`, `red_societaria.json`, `clusters_riesgo.csv` |
 | 5 — Indicadores | `indicadores_internacionales.py` | `indicadores_internacionales.csv`, `perfil_riesgo_completo.csv` |
 
 ---
+
+## Tipo de cambio
+
+Único para todo el sistema (ETL, scoring, API y dashboard): dólar **minorista,
+promedio vendedor, último día hábil de diciembre** del año declarado — API de
+estadísticas del BCRA v4.0, variable 4 (`scripts/tipo_cambio.py`). Dic-2023:
+$847,11 · dic-2024: $1.060,28. El IVPI se calcula en pesos; los USD son para mostrar.
+
+## Fuentes que se resuelven solas
+
+- DDJJ (anuales, bienes, deudas) y nómina de magistrados: el corte vigente se
+  busca en el catálogo de datos.jus.gob.ar en cada corrida.
+- Adjudicaciones para el cruce de conflicto de interés: Monitor Contratos
+  (`CONTRATOS_API_URL`, por defecto https://contratos.ecosistematransparencia.com.ar).
 
 ## 12 Indicadores Internacionales
 
@@ -124,9 +138,9 @@ uvicorn api.main:app --reload --port 8000
 | GET | `/api/scoring` | Ranking Fase 3 |
 | GET | `/api/alertas` | Alertas Fase 2 |
 | GET | `/api/funcionario/{cuil}` | Perfil |
-| GET | `/api/grafo` | Red societaria |
+| GET | `/api/grafo` | Red societaria (sin datos: la DDJJ publicada no trae CUIT de sociedades) |
 | GET | `/api/anomalias` | ML anomalías |
-| GET | `/api/clusters` | Clusters |
+| GET | `/api/clusters` | Clusters (sin datos, mismo motivo) |
 | GET | `/api/indicadores/resumen` | KPIs internacionales |
 | GET | `/api/indicadores/ranking` | Ranking por score int. |
 | GET | `/api/indicadores/funcionario/{cuil}` | Breakdown por marco |

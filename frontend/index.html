@@ -600,7 +600,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
           <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">💰 Patrimonio declarado</div>
-          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Bienes totales finales e inicio del período (ARS), su equivalente en USD al tipo de cambio oficial BNA de diciembre del año declarado, y la variación porcentual entre ambos.</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Bienes totales finales e inicio del período (ARS), su equivalente en USD al tipo de cambio minorista del BCRA (promedio vendedor) del último día hábil de diciembre del año declarado, y la variación porcentual entre ambos.</div>
         </div>
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
           <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📊 Ingresos e IVPI</div>
@@ -719,8 +719,8 @@
         <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
           <div style="font-size:.8rem;font-weight:700;color:#00d4aa;margin-bottom:10px">💰 Conversión ARS ↔ USD</div>
           <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
-            Los montos se convierten al tipo de cambio oficial BNA de fin de diciembre del año declarado:
-            <strong style="color:#c8d0e0">2022: $177 · 2023: $808 · 2024: $1.045</strong> — misma metodología usada por Chequeado y La Nación Data.
+            Los montos se convierten al tipo de cambio minorista del BCRA (promedio vendedor) del último día hábil de diciembre del año declarado:
+            <strong style="color:#c8d0e0">2022: $184,64 · 2023: $847,11 · 2024: $1.060,28</strong> (API de estadísticas del BCRA, variable 4).
           </p>
         </div>
       </div>
@@ -1628,7 +1628,7 @@ function abrirFicha(poder, key) {
       </div>
       <div class="modal-stat">
         <div class="modal-stat-val">${fmtUSD(r.pn_actual || r.patrimonio_usd)}</div>
-        <div class="modal-stat-lbl">Equivalente en <strong>dólares (USD)</strong> · TC oficial BNA dic-${r.anio||r.año||2024}: $${fmt(Math.round(r.tc_conversion_usd || 1045))}/USD</div>
+        <div class="modal-stat-lbl">Equivalente en <strong>dólares (USD)</strong> · TC minorista BCRA dic-${r.anio||r.año||2024}: $${fmt(Math.round(r.tc_conversion_usd || 1060))}/USD</div>
       </div>
       <div class="modal-stat">
         <div class="modal-stat-val">${fmtARS(r.total_bienes_inicio || r.patrimonio_ars_ant)}</div>
@@ -1659,7 +1659,7 @@ function abrirFicha(poder, key) {
     <div class="modal-grid">
       <div class="modal-stat">
         <div class="modal-stat-val">${fmtUSD(r.ingresos)}</div>
-        <div class="modal-stat-lbl">Ingresos netos declarados en USD (deflactados TC dic-${r.anio||r.año||2024}: $${fmt(Math.round(r.tc_conversion_usd || ((r.anio||r.año||2024)==2022?177:(r.anio||r.año||2024)==2023?808:1045)))})</div>
+        <div class="modal-stat-lbl">Ingresos netos declarados en USD (deflactados TC dic-${r.anio||r.año||2024}: $${fmt(Math.round(r.tc_conversion_usd || ((r.anio||r.año||2024)==2022?185:(r.anio||r.año||2024)==2023?847:1060)))})</div>
       </div>
       <div class="modal-stat">
         <div class="modal-stat-val" style="color:${r.ivpi_bandera==='ROJA'?'#e63946':r.ivpi_bandera==='AMARILLA'?'#ffd060':'#2ec27e'}">
@@ -1697,8 +1697,8 @@ function abrirFicha(poder, key) {
     <div style="margin-top:14px;padding:10px 14px;background:#0f1a10;border:1px solid #1a3a20;border-radius:6px;font-size:.68rem;color:#5a7a60;line-height:1.6">
       ⚠️ <strong style="color:#6a9a70">Nota metodológica:</strong>
       Los valores en ARS son los declarados en la DDJJ original (fuente: OA / datos.jus.gob.ar).
-      Los valores en USD se calculan usando el <strong style="color:#6a9a70">TC oficial BNA de fin de diciembre del año declarado</strong>
-      (2022: $177 · 2023: $808 · 2024: $1.045) — igual metodología que Chequeado y La Nación Data.
+      Los valores en USD se calculan usando el <strong style="color:#6a9a70">TC minorista BCRA de fin de diciembre del año declarado</strong>
+      (2022: $184,64 · 2023: $847,11 · 2024: $1.060,28 — API de estadísticas del BCRA, variable 4).
       El IVPI mide cuántas veces el incremento patrimonial supera los ingresos declarados — no implica ilicitud.
       Efectivo y exterior salen del detalle de bienes de la OA; con patrimonios menores a USD 10.000 figuran como SIN_DATOS.
     </div>
@@ -1718,11 +1718,11 @@ function abrirFicha(poder, key) {
     // ── Gráfico evolución histórica ──────────────────────────────────────
     const evol = histData?.evolucion || {};
     const años = Object.keys(evol).sort();
-    const TC_AÑO = { '2022': 177, '2023': 808, '2024': 1045 };
+    const TC_AÑO = { '2022': 184.64, '2023': 847.11, '2024': 1060.28 };
 
     if (años.length >= 2) {
       const pts = años.map(a => {
-        const pn = evol[a]?.pn_usd ?? (evol[a]?.pn_nominal ? evol[a].pn_nominal / (TC_AÑO[a] || 1045) : null);
+        const pn = evol[a]?.pn_usd ?? (evol[a]?.pn_nominal ? evol[a].pn_nominal / (TC_AÑO[a] || 1060.28) : null);
         return { año: a, usd: pn ? Math.round(pn) : null };
       }).filter(p => p.usd != null);
 
@@ -1732,7 +1732,7 @@ function abrirFicha(poder, key) {
         if (chartDiv) {
           chartDiv.innerHTML = `
             <div class="card-title" style="margin-bottom:10px">
-              📈 Evolución patrimonial declarada (USD · TC oficial BNA fin de año)
+              📈 Evolución patrimonial declarada (USD · TC minorista BCRA fin de año)
             </div>
             <div style="position:relative;height:200px">
               <canvas id="modal-chart-evol"></canvas>
@@ -1767,7 +1767,7 @@ function abrirFicha(poder, key) {
                     callbacks: {
                       label: ctx => {
                         const a = pts[ctx.dataIndex]?.año;
-                        const tc = TC_AÑO[a] || 1045;
+                        const tc = TC_AÑO[a] || 1060.28;
                         return ` USD ${Number(ctx.raw).toLocaleString('es-AR')} · TC dic-${a}: $${tc}`;
                       }
                     }

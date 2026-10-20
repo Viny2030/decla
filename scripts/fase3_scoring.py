@@ -6,9 +6,11 @@ import pandas as pd
 try:
     from scripts.utils_oa import parsear_oa_serie
     from scripts.listas_gafi import riesgo_pais
+    from scripts.tipo_cambio import tc_por_anio
 except ImportError:
     from utils_oa import parsear_oa_serie
     from listas_gafi import riesgo_pais
+    from tipo_cambio import tc_por_anio
 
 logging.basicConfig(level=logging.INFO, format="[SCORING] %(message)s")
 log = logging.getLogger(__name__)
@@ -21,8 +23,9 @@ UMBRAL_IVPI_AMARILLO = 1.5
 UMBRAL_EFECTIVO_ROJO = 0.5
 UMBRAL_OFFSHORE_ROJO = 0.2
 
-TC_POR_ANNO = {2021: 102.75, 2022: 177.16, 2023: 808.45, 2024: 1045.00}
-TC_DEFAULT = 1045.00
+# Mismo TC que la fase 1 (data/processed/tipo_cambio.csv, BCRA minorista).
+TC_POR_ANNO = tc_por_anio()
+TC_DEFAULT = TC_POR_ANNO[max(TC_POR_ANNO)]
 
 def _tc_act(s): return s.map(lambda a: TC_POR_ANNO.get(int(a) if pd.notna(a) else 2024, TC_DEFAULT))
 def _tc_ant(s): return s.map(lambda a: TC_POR_ANNO.get((int(a)-1) if pd.notna(a) else 2023, TC_POR_ANNO.get(2023)))
@@ -48,7 +51,7 @@ def calcular_ivpi(df):
     ingresos               = ingreso neto (cat. 1 a 4) + ingresos no alcanzados
 
     Todo se calcula en PESOS con los rubros que declara el propio funcionario;
-    los dólares son sólo para mostrar (TC BNA de cada fecha).
+    los dólares son sólo para mostrar (TC minorista BCRA de fin de cada año).
 
     Cambios respecto de la versión anterior (que marcaba 2.066 filas en rojo):
       - usaba bienes brutos (sin deudas) y no descontaba la diferencia de
@@ -204,12 +207,23 @@ def run_scoring():
     df = _cargar("ddjj_normalizada.csv")
     if df.empty:
         log.error("Sin datos. Corre fase1_etl.py primero."); return pd.DataFrame()
+    # Filas sin año válido (el consolidado 2024 trae una con anio=0 y tipo "0.00"
+    # que no es una DDJJ): se descartan en vez de rankearlas.
+    ac = _col(df, ["anio", "anno", "periodo", "anio_declaracion"])
+    if ac:
+        anio = pd.to_numeric(df[ac], errors="coerce")
+        invalidas = ~anio.between(2000, 2100)
+        if invalidas.any():
+            log.warning(f"Descartadas {int(invalidas.sum())} filas sin año válido")
+            df = df[~invalidas]
     df = deduplicar(df)
     df = calcular_ivpi(df)
     df = calcular_opacidad_fuga(df)
     df = calcular_score(df)
     cols = [c for c in ["dj_id","cuit","funcionario_apellido_nombre","organismo","cargo","poder","sector","anio","desde","total_bienes_inicio","total_bienes_final","total_ingreso_neto_c1234","ingresos_neto_gastos","tipo_declaracion_jurada_descripcion","pn_actual","pn_ant","ingresos","delta_pn","ajustes_valuacion_herencia_usd","tc_conversion_usd","tc_ant_usd","ivpi","ivpi_bandera","ivpi_motivo","efectivo_usd","exterior_usd","participaciones_usd","n_participaciones","paises_exterior","jurisdiccion_riesgo","paises_riesgo","proveedor_contratista","opacidad_ratio","opacidad_bandera","fuga_ratio","fuga_bandera","score_riesgo","nivel_riesgo"] if c in df.columns]
-    salida = df[cols].sort_values("score_riesgo", ascending=False)
+    # Desempate por CUIT: sin él los empates salían en otro orden en cada
+    # corrida y el commit diario reescribía ~32.000 renglones sin cambios.
+    salida = df[cols].sort_values(["score_riesgo", "cuit"], ascending=[False, True], kind="mergesort")
     salida.to_csv(PROC_DIR / "scoring_riesgo.csv", index=False)
     for n in ["CRÍTICO","ALTO","MEDIO","BAJO"]:
         log.info(f"  {n}: {(salida['nivel_riesgo']==n).sum()}")

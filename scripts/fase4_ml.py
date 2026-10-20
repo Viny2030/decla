@@ -150,6 +150,13 @@ def run_ml() -> dict:
 
     anomalias = pd.DataFrame()
     if not df_score.empty:
+        # Orden fijo de entrada: Isolation Forest (aun con random_state) depende
+        # del orden de las filas. Como scoring_riesgo.csv venía con empates en
+        # distinto orden cada día, ~150 personas entraban y salían de la lista
+        # de anomalías sin que cambiara ningún dato.
+        orden = [c for c in ("dj_id", "cuit") if c in df_score.columns]
+        if orden:
+            df_score = df_score.sort_values(orden, kind="mergesort").reset_index(drop=True)
         X, _ = preparar_features(df_score)
         if not X.empty:
             df_score = isolation_forest(df_score, X)

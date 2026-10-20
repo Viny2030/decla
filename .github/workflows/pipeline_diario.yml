@@ -21,6 +21,8 @@ jobs:
       ARCA_CERT: ${{ secrets.ARCA_CERT }}
       ARCA_KEY:  ${{ secrets.ARCA_KEY }}
       ARCA_PROD: ${{ secrets.ARCA_PROD }}   # "1" = producción, omitir o "0" = homo
+      # Monitor Contratos (adjudicaciones del Boletín Oficial) para el cruce de conflicto de interés
+      CONTRATOS_API_URL: ${{ vars.CONTRATOS_API_URL || 'https://contratos.ecosistematransparencia.com.ar' }}
 
     steps:
       - name: Checkout
@@ -68,6 +70,7 @@ jobs:
           git add -f data/processed/alertas_puertas_giratorias.csv || true
           git add -f data/processed/alertas_conflicto.csv || true
           git add -f data/processed/tabla_judicial.csv || true
+          git add -f data/processed/tipo_cambio.csv || true
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Monitor DDJJ $(date +'%Y-%m-%d') — pipeline completo"

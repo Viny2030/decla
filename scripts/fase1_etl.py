@@ -12,6 +12,7 @@ Salidas:
 """
 
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -19,8 +20,10 @@ import requests
 
 try:
     from scripts.utils_oa import parsear_oa_serie
+    from scripts import tipo_cambio
 except ImportError:
     from utils_oa import parsear_oa_serie
+    import tipo_cambio
 
 logging.basicConfig(level=logging.INFO, format="[ETL] %(message)s")
 log = logging.getLogger(__name__)
@@ -55,20 +58,63 @@ MAGISTRADOS_URL = (
     "/resource/b12bdbb7-646f-4701-99b7-1109ce919dd5"
     "/download/magistrados-justicia-federal-nacional-jueces-20260605.csv"
 )
+# Catálogo CKAN de datos.jus.gob.ar: el nombre de los archivos cambia con cada
+# corte ("...-consolidado-al-20251222.csv", "...-jueces-20260605.csv"). Se busca
+# el vigente en el catálogo y, si no responde, se usan las URLs fijas de arriba.
+CKAN_PKG = "https://datos.jus.gob.ar/api/3/action/package_show?id={id}"
+DDJJ_PKG = "4680199f-6234-4262-8a2a-8f7993bf784d"
+MAGISTRADOS_PKG = "3c18d46e-729e-4973-8efd-f54cab18b7e3"
 MAGISTRADOS_CONSULTA = "https://ddjjpp.pjn.gov.ar"  # formulario oficial de solicitud (la DDJJ no se accede por link directo)
 
-# API pública de estadísticas del BCRA v4.0 (sin clave). La v2.0 que se usaba
-# devuelve 410 Gone desde 2025 y el ETL caía siempre a un TC fijo de $900.
-# Variable 4 = tipo de cambio minorista (promedio vendedor).
-BCRA_API = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4?desde={desde}&hasta={hasta}"
-# Respaldo: TC BNA de fin de diciembre (mismo que usa fase3_scoring)
-TC_RESPALDO = {2021: 102.75, 2022: 177.16, 2023: 808.45, 2024: 1045.00}
+# Tipo de cambio: scripts/tipo_cambio.py (BCRA v4.0, minorista promedio
+# vendedor del último día hábil de diciembre). Es la única fuente: la fase 3,
+# la API y el dashboard leen el tipo_cambio.csv que se escribe acá.
+
+
+def _recursos_ckan(pkg: str) -> list[str]:
+    try:
+        r = requests.get(CKAN_PKG.format(id=pkg), headers={"User-Agent": "monitor-ddjj/1.0"}, timeout=60)
+        r.raise_for_status()
+        return [res.get("url", "") for res in r.json()["result"]["resources"]]
+    except Exception as e:
+        log.warning(f"Catálogo datos.jus.gob.ar no disponible ({e}): uso URLs fijas")
+        return []
+
+
+def _ultimo(urls: list[str], patron: str) -> str | None:
+    """La URL más reciente que matchea el patrón (año y fecha de corte en el nombre)."""
+    cands = []
+    for u in urls:
+        m = re.search(patron, u.rsplit("/", 1)[-1])
+        if m:
+            cands.append((m.groups(), u))
+    return max(cands)[1] if cands else None
+
+
+def resolver_endpoints() -> dict[str, str]:
+    """URLs vigentes de las DDJJ (anuales, bienes, deudas): toma el año más
+    reciente que tenga los tres archivos consolidados."""
+    urls = _recursos_ckan(DDJJ_PKG)
+    out = dict(ENDPOINTS)
+    pat = {
+        "ddjj_anuales": r"^declaraciones-juradas-(\d{4})-consolidado-al-(\d{8})\.csv$",
+        "ddjj_bienes":  r"^declaraciones-juradas-bienes-(\d{4})-consolidado-al-(\d{8})\.csv$",
+        "ddjj_deudas":  r"^declaraciones-juradas-deudas-(\d{4})-consolidado-al-(\d{8})\.csv$",
+    }
+    hallados = {k: _ultimo(urls, p) for k, p in pat.items()}
+    anios = {k: re.search(r"-(\d{4})-consolidado", u).group(1) for k, u in hallados.items() if u}
+    if len(anios) == 3 and len(set(anios.values())) == 1:
+        out.update(hallados)
+        log.info(f"Catálogo OA: DDJJ {next(iter(anios.values()))} — {hallados['ddjj_anuales'].rsplit('/', 1)[-1]}")
+    elif urls:
+        log.warning(f"Catálogo OA sin un corte completo (anuales/bienes/deudas del mismo año): uso URLs fijas")
+    return out
 
 
 def descargar_fuentes() -> dict[str, pd.DataFrame]:
     dfs = {}
     headers = {"User-Agent": "monitor-ddjj/1.0 (academico)"}
-    for nombre, url in ENDPOINTS.items():
+    for nombre, url in resolver_endpoints().items():
         dest = RAW_DIR / f"{nombre}.csv"
         if dest.exists():
             log.info(f"{nombre}: caché local ({dest.stat().st_size // 1024} KB)")
@@ -93,8 +139,10 @@ def descargar_magistrados() -> pd.DataFrame:
         log.info(f"magistrados: caché local ({dest.stat().st_size // 1024} KB)")
         return pd.read_csv(dest, low_memory=False)
     try:
-        log.info("Descargando nómina magistrados federales...")
-        r = requests.get(MAGISTRADOS_URL, headers={"User-Agent": "monitor-ddjj/1.0"}, timeout=60)
+        url = _ultimo(_recursos_ckan(MAGISTRADOS_PKG),
+                      r"^magistrados-justicia-federal-nacional-jueces-(\d{8})\.csv$") or MAGISTRADOS_URL
+        log.info(f"Descargando nómina magistrados federales ({url.rsplit('/', 1)[-1]})...")
+        r = requests.get(url, headers={"User-Agent": "monitor-ddjj/1.0"}, timeout=60)
         r.raise_for_status()
         dest.write_bytes(r.content)
         df = pd.read_csv(dest, low_memory=False)
@@ -106,29 +154,11 @@ def descargar_magistrados() -> pd.DataFrame:
 
 
 def obtener_tipo_cambio(anio: int = 2024) -> float:
-    """TC minorista vendedor del último día hábil de diciembre del año declarado."""
-    tc_path = RAW_DIR / f"tipo_cambio_{anio}.csv"
-    if tc_path.exists():
-        try:
-            return float(pd.read_csv(tc_path)["valor"].iloc[0])
-        except Exception:
-            pass
-    try:
-        url = BCRA_API.format(desde=f"{anio}-12-01", hasta=f"{anio}-12-31")
-        r = requests.get(url, timeout=30, headers={"User-Agent": "monitor-ddjj/1.0"})
-        r.raise_for_status()
-        res = r.json().get("results", [])
-        detalle = res[0].get("detalle", []) if res else []
-        if detalle:
-            ult = max(detalle, key=lambda d: d["fecha"])
-            pd.DataFrame([ult]).to_csv(tc_path, index=False)
-            log.info(f"TC BCRA v4.0 ({ult['fecha']}): ${float(ult['valor']):.2f}")
-            return float(ult["valor"])
-    except Exception as e:
-        log.warning(f"BCRA no disponible: {e}")
-    tc = TC_RESPALDO.get(anio, TC_RESPALDO[max(TC_RESPALDO)])
-    log.warning(f"Usando TC de respaldo ${tc:.2f} (BNA dic-{anio})")
-    return tc
+    """TC minorista vendedor del último día hábil de diciembre del año declarado.
+    Guarda también el del año anterior (la fase 3 lo usa para el patrimonio inicial)."""
+    tipo_cambio.actualizar_tabla([anio - 1, anio])
+    tcs = tipo_cambio.tc_por_anio()
+    return tcs.get(anio, tcs[max(tcs)])
 
 
 def normalizar_cuil(valor) -> str | None:

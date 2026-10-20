@@ -3,6 +3,8 @@ scripts/fase2_cruces.py
 ━━━━━━━━━━━━━━━━━━━━━━━
 Fase 2 — Motor de Cruce Relacional
   Cruce 1: CUIT sociedad DDJJ × adjudicaciones Comprar.gob.ar  → alerta ROJA
+  Cruce 1a: CUIT del funcionario × adjudicaciones del Boletín Oficial
+            (Monitor Contratos, CONTRATOS_API_URL)                → alerta ROJA
   Cruce 1b: DDJJ "proveedor o contratista del Estado" = SI       → alerta AMARILLA
   Cruce 2: Actividades anteriores/posteriores (MAPPAP, OA): paso privado↔público
            en menos de 365 días o empleo privado simultáneo                → AMARILLA
@@ -12,7 +14,9 @@ Salidas:
   data/processed/alertas_puertas_giratorias.csv
 """
 
+import io
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -26,10 +30,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 PROC_DIR = BASE_DIR / "data" / "processed"
 RAW_DIR  = BASE_DIR / "data" / "raw"
 
-COMPRAR_URL = (
-    "https://contrataciones.economia.gob.ar/api/v2/licitaciones"
-    "?estado=adjudicada&limit=1000&offset={offset}"
-)
+# El endpoint anterior (contrataciones.economia.gob.ar/api/v2/licitaciones)
+# dejó de existir (el dominio no resuelve): el cruce rojo daba siempre 0 y el
+# error quedaba escondido en el log. Ahora se usan las adjudicaciones que el
+# Monitor Contratos del ecosistema extrae del Boletín Oficial.
+CONTRATOS_API_URL = os.getenv("CONTRATOS_API_URL", "https://contratos.ecosistematransparencia.com.ar").rstrip("/")
+CONTRATOS_CSV = CONTRATOS_API_URL + "/api/contratos.csv"
 
 
 def _col(df: pd.DataFrame, candidatos: list[str]) -> str | None:
@@ -45,30 +51,24 @@ def _cargar(nombre: str) -> pd.DataFrame:
 
 
 def descargar_adjudicaciones() -> pd.DataFrame:
-    dest = RAW_DIR / "comprar_adjudicaciones.csv"
-    if dest.exists():
-        log.info("Comprar: caché local")
-        return pd.read_csv(dest, low_memory=False)
-    registros, offset = [], 0
-    headers = {"User-Agent": "monitor-ddjj/1.0"}
-    while True:
-        try:
-            r = requests.get(COMPRAR_URL.format(offset=offset), headers=headers, timeout=30)
-            items = r.json().get("data", {}).get("licitaciones", [])
-            if not items:
-                break
-            registros.extend(items)
-            log.info(f"  Comprar: {len(registros)} adjudicaciones...")
-            if len(items) < 1000:
-                break
-            offset += 1000
-        except Exception as e:
-            log.warning(f"  Error Comprar: {e}")
-            break
-    df = pd.json_normalize(registros) if registros else pd.DataFrame()
-    if not df.empty:
+    """Adjudicaciones del Boletín Oficial (Monitor Contratos). Columnas clave:
+    cuit_proveedor, proveedor_adjudicado, organismo_contratante,
+    monto_adjudicado_bora, fecha, link_bora."""
+    dest = RAW_DIR / "contratos_adjudicaciones.csv"
+    try:
+        r = requests.get(CONTRATOS_CSV, headers={"User-Agent": "monitor-ddjj/1.0"}, timeout=120)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.content.decode("utf-8-sig")), sep=";", dtype=str)
         df.to_csv(dest, index=False)
-    return df
+        con_cuit = df["cuit_proveedor"].map(_digitos).str.len().eq(11).sum() if "cuit_proveedor" in df.columns else 0
+        log.info(f"  Contratos (BORA): {len(df)} adjudicaciones, {con_cuit} con CUIT — {CONTRATOS_API_URL}")
+        return df
+    except Exception as e:
+        log.error(f"  Contratos no disponible ({CONTRATOS_CSV}): {e}")
+        if dest.exists():
+            log.warning("  Uso la última copia descargada")
+            return pd.read_csv(dest, dtype=str)
+        return pd.DataFrame()
 
 
 _RE_CUIT = re.compile(r"^(20|23|24|27|30|33|34)\d{9}$")
@@ -145,8 +145,8 @@ def cruce1_conflicto_interes(ddjj: pd.DataFrame, adjudicaciones: pd.DataFrame) -
 
     sociedades = extraer_cuits_sociedades(ddjj)
     if not sociedades.empty and not adjudicaciones.empty:
-        cuit_col_adj = _col(adjudicaciones, [
-            c for c in adjudicaciones.columns if "cuit" in c.lower() or "proveedor" in c.lower()])
+        cuit_col_adj = _col(adjudicaciones, ["cuit_proveedor"] + [
+            c for c in adjudicaciones.columns if "cuit" in c.lower()])
         if cuit_col_adj:
             adjudicaciones["cuit_norm"] = adjudicaciones[cuit_col_adj].map(_digitos)
             sociedades["cuit_norm"]     = sociedades["cuit_sociedad"].map(_digitos)
@@ -156,6 +156,24 @@ def cruce1_conflicto_interes(ddjj: pd.DataFrame, adjudicaciones: pd.DataFrame) -
                 a["criticidad"]  = "ROJA"
                 a["descripcion"] = "Funcionario con participación societaria en empresa adjudicada en Comprar.gob.ar."
                 partes.append(a)
+
+    # 1a. El propio funcionario (persona física) figura como proveedor adjudicado
+    if not adjudicaciones.empty and "cuit_proveedor" in adjudicaciones.columns and "cuit" in ddjj.columns:
+        adj = adjudicaciones.assign(cuil_funcionario=adjudicaciones["cuit_proveedor"].map(_digitos))
+        adj = adj[adj["cuil_funcionario"].str.len() == 11]
+        base = _base_personas(ddjj).drop_duplicates("cuil_funcionario")
+        a = base.merge(adj, on="cuil_funcionario", how="inner")
+        if not a.empty:
+            a = a.assign(cuit_sociedad=a["cuil_funcionario"], sociedad=a.get("proveedor_adjudicado", ""),
+                         tipo_alerta="FUNCIONARIO_PROVEEDOR_ADJUDICADO", criticidad="ROJA",
+                         descripcion="El CUIT del funcionario figura como proveedor adjudicado en el Boletín Oficial ("
+                                     + a.get("organismo_contratante", "").fillna("").astype(str) + ", "
+                                     + a.get("fecha", "").fillna("").astype(str) + ", "
+                                     + a.get("monto_adjudicado_bora", "").fillna("").astype(str) + "). "
+                                     + a.get("link_bora", "").fillna("").astype(str)
+                                     + " Verificar incompatibilidad (Ley 25.188, art. 13).")
+            partes.append(a)
+        log.info(f"  Funcionarios adjudicados en BORA: {a['cuil_funcionario'].nunique() if not a.empty else 0}")
 
     if "proveedor_contratista" in ddjj.columns:
         p = _base_personas(ddjj)

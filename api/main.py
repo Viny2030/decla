@@ -267,42 +267,20 @@ def historico_funcionario(cuit: str):
         raise HTTPException(404, f"CUIT {cuit} no encontrado en ningún año.")
 
     evolucion = {}
-    TC_POR_AÑO = {"2022": 177.16, "2023": 808.45, "2024": 1045.0}
+    from scripts.tipo_cambio import tc_por_anio
+    TC_POR_AÑO = {str(a): v for a, v in tc_por_anio().items()}
 
-    def parsear_oa(v):
-        """Parsea formato OA: '11851166833-39' → 11851166833.39"""
-        if v is None or (isinstance(v, float) and pd.isna(v)):
-            return None
-        s = str(v).strip()
-        if not s or s in ('---', '--', '-', 'None', 'nan'):
-            return None
-        try:
-            # Ya es número
-            return float(s)
-        except ValueError:
-            pass
-        # Formato OA: dígitos-dígitos
-        if '-' in s:
-            partes = s.rsplit('-', 1)
-            entero = partes[0].replace('-','').replace(',','')
-            decimal = partes[1] if len(partes) > 1 else '0'
-            try:
-                return float(f"{entero}.{decimal}")
-            except ValueError:
-                return None
-        return None
+    from scripts.utils_oa import parsear_oa
 
-    import pandas as pd
     for anio, row in resultado.items():
-        tc = TC_POR_AÑO.get(str(anio), 1045.0)
+        tc = TC_POR_AÑO.get(str(anio), TC_POR_AÑO[max(TC_POR_AÑO)])
 
-        # Intentar columna ya deflactada primero
-        pn_usd = row.get("total_bienes_final_usd") or row.get("pn_actual")
-
-        # Si no, parsear desde ARS
-        if not pn_usd:
-            pn_ars = parsear_oa(row.get("total_bienes_final") or row.get("total_bienes_inicio"))
-            pn_usd = round(pn_ars / tc, 2) if pn_ars else None
+        # Patrimonio NETO = bienes − deudas al cierre (antes se informaba como
+        # "pn_usd" el total de bienes brutos, sin descontar deudas).
+        bienes_ars = parsear_oa(row.get("total_bienes_final") or row.get("total_bienes_inicio"))
+        deudas_ars = parsear_oa(row.get("total_deudas_final")) or 0.0
+        bienes_usd = round(bienes_ars / tc, 2) if bienes_ars is not None else None
+        pn_usd = round((bienes_ars - deudas_ars) / tc, 2) if bienes_ars is not None else row.get("pn_actual")
 
         ing_ars = parsear_oa(
             row.get("total_ingreso_neto_c1234") or
@@ -314,6 +292,7 @@ def historico_funcionario(cuit: str):
 
         evolucion[anio] = {
             "pn_usd":    pn_usd,
+            "bienes_usd": bienes_usd,
             "ing_usd":   ing_usd,
             "tc_usado":  tc,
         }
