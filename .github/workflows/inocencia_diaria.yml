@@ -16,7 +16,7 @@ jobs:
     env:
       ARCA_CERT: ${{ secrets.ARCA_CERT }}
       ARCA_KEY:  ${{ secrets.ARCA_KEY }}
-      ARCA_PROD: ${{ secrets.ARCA_PROD }}   # "1" = producción (el certificado MonitorXAI es de producción)
+      ARCA_PROD: ${{ vars.ARCA_PROD || '1' }}   # "1" = producción. Variable, no secret: como secret GitHub tapaba con *** cada "1" de los logs
       ARCA_CUIT: ${{ secrets.ARCA_CUIT }}   # CUIT titular del certificado (cuitRepresentada)
 
     steps:

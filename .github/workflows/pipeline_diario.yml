@@ -20,7 +20,7 @@ jobs:
     env:
       ARCA_CERT: ${{ secrets.ARCA_CERT }}
       ARCA_KEY:  ${{ secrets.ARCA_KEY }}
-      ARCA_PROD: ${{ secrets.ARCA_PROD }}   # "1" = producción, omitir o "0" = homo
+      ARCA_PROD: ${{ vars.ARCA_PROD || '1' }}   # "1" = producción. Variable, no secret: como secret GitHub tapaba con *** cada "1" de los logs
       # Monitor Contratos (adjudicaciones del Boletín Oficial) para el cruce de conflicto de interés
       CONTRATOS_API_URL: ${{ vars.CONTRATOS_API_URL || 'https://contratos.ecosistematransparencia.com.ar' }}
 

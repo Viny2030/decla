@@ -239,6 +239,11 @@ def historico_funcionario(cuit: str):
 
     for anio, fname in nombres.items():
         df = _csv(fname)
+        # ddjj_normalizada.csv no se sube al repo (sólo existe dentro del
+        # pipeline): en producción este endpoint daba 404 para todos. El
+        # scoring sí se publica y trae una DDJJ por persona con pn_actual.
+        if df.empty and anio == "2024":
+            df = _csv("scoring_riesgo.csv")
         if df.empty:
             continue
         cuil_col = _col(df, ["cuit", "cuil", "cuil_declarante"])
@@ -280,7 +285,10 @@ def historico_funcionario(cuit: str):
         bienes_ars = parsear_oa(row.get("total_bienes_final") or row.get("total_bienes_inicio"))
         deudas_ars = parsear_oa(row.get("total_deudas_final")) or 0.0
         bienes_usd = round(bienes_ars / tc, 2) if bienes_ars is not None else None
-        pn_usd = round((bienes_ars - deudas_ars) / tc, 2) if bienes_ars is not None else row.get("pn_actual")
+        if row.get("pn_actual") is not None and "total_deudas_final" not in row:
+            pn_usd = row.get("pn_actual")          # viene del scoring (mismo cálculo)
+        else:
+            pn_usd = round((bienes_ars - deudas_ars) / tc, 2) if bienes_ars is not None else row.get("pn_actual")
 
         ing_ars = parsear_oa(
             row.get("total_ingreso_neto_c1234") or
