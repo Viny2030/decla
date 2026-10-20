@@ -11,6 +11,7 @@ Variables de entorno:
 """
 
 import os
+import re
 import base64
 import datetime
 import pickle
@@ -33,21 +34,90 @@ TTL_MINUTES = 720  # 12 horas — ARCA exige menos de 24hs
 
 # ── Helpers cert/key ───────────────────────────────────────────────────────────
 
-def _resolver_pem(valor: str, sufijo: str) -> str:
-    """Ruta a archivo o contenido PEM directo → siempre devuelve ruta."""
-    if valor and Path(valor).exists():
-        return valor
-    tmp = Path(tempfile.mktemp(suffix=sufijo, dir=tempfile.gettempdir()))
-    tmp.write_text(valor)
+class ArcaCredencialesError(RuntimeError):
+    """Certificado o clave ARCA ilegibles: falla de configuración, no del CUIT."""
+
+
+def _normalizar_pem(valor: str, nombre: str) -> str:
+    """Acepta el PEM tal como suele quedar guardado en un secret y lo deja
+    con el formato que espera openssl:
+      - con los saltos de línea escritos como "\\n" literal;
+      - con CRLF;
+      - todo en una línea (saltos convertidos en espacios);
+      - el archivo entero codificado en base64.
+    Nunca imprime el contenido."""
+    s = (valor or "").strip().strip('"').strip("'")
+    if "-----BEGIN" not in s:
+        try:
+            dec = base64.b64decode(s, validate=False).decode("utf-8", errors="strict")
+            if "-----BEGIN" in dec:
+                s = dec.strip()
+        except Exception:
+            pass
+    s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+    if "-----BEGIN" not in s or "-----END" not in s:
+        raise ArcaCredencialesError(
+            f"{nombre} no es una ruta existente ni un PEM válido (falta -----BEGIN/-----END). "
+            f"Cargar en el secret el contenido completo del archivo.")
+    # PEM en una sola línea: rearmar cabecera / cuerpo en líneas de 64 / pie
+    bloques = []
+    for m in re.finditer(r"(-----BEGIN [A-Z0-9 ]+-----)(.*?)(-----END [A-Z0-9 ]+-----)", s, re.S):
+        cuerpo = re.sub(r"\s+", "", m.group(2))
+        lineas = [cuerpo[i:i + 64] for i in range(0, len(cuerpo), 64)]
+        bloques.append("\n".join([m.group(1), *lineas, m.group(3)]))
+    if not bloques:
+        raise ArcaCredencialesError(f"{nombre}: PEM mal formado.")
+    return "\n".join(bloques) + "\n"
+
+
+_PEM_CACHE: dict[tuple[str, str], str] = {}
+
+
+def _resolver_pem(valor: str, sufijo: str, nombre: str = "ARCA_CERT") -> str:
+    """Ruta a archivo o contenido PEM directo → siempre devuelve ruta.
+    Se resuelve una sola vez por valor (antes se escribía un archivo temporal
+    nuevo en cada consulta)."""
+    if valor and len(valor) < 400 and "-----BEGIN" not in valor:
+        if Path(valor).exists():
+            return valor
+        if valor.lower().endswith((".crt", ".key", ".pem")) or "/" in valor or "\\" in valor:
+            raise ArcaCredencialesError(
+                f"{nombre} apunta a un archivo que no existe ({Path(valor).name}). "
+                f"En GitHub Actions el secret debe tener el CONTENIDO del archivo, no la ruta.")
+    clave = (valor, sufijo)
+    if clave in _PEM_CACHE and Path(_PEM_CACHE[clave]).exists():
+        return _PEM_CACHE[clave]
+    pem = _normalizar_pem(valor, nombre)
+    fd, ruta = tempfile.mkstemp(suffix=sufijo, dir=tempfile.gettempdir())
+    with os.fdopen(fd, "w") as f:
+        f.write(pem)
     try:
-        tmp.chmod(0o600)
+        os.chmod(ruta, 0o600)
     except Exception:
         pass
-    return str(tmp)
+    _PEM_CACHE[clave] = ruta
+    return ruta
 
 
 def _get_cert_key_paths(cert: str, key: str) -> tuple[str, str]:
-    return _resolver_pem(cert, ".crt"), _resolver_pem(key, ".key")
+    return _resolver_pem(cert, ".crt", "ARCA_CERT"), _resolver_pem(key, ".key", "ARCA_KEY")
+
+
+def verificar_credenciales(cert_path: str = None, key_path: str = None) -> dict:
+    """Comprueba con openssl que el certificado y la clave se pueden leer.
+    Devuelve sujeto y vencimiento del certificado (datos públicos).
+    Lanza ArcaCredencialesError con el mensaje de openssl si no."""
+    cert_file, key_file = _get_cert_key_paths(cert_path or os.environ.get("ARCA_CERT", ""),
+                                              key_path or os.environ.get("ARCA_KEY", ""))
+    r = subprocess.run(["openssl", "x509", "-in", cert_file, "-noout", "-subject", "-enddate"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ArcaCredencialesError(f"ARCA_CERT ilegible para openssl: {r.stderr.strip()[:300]}")
+    k = subprocess.run(["openssl", "pkey", "-in", key_file, "-noout"], capture_output=True, text=True)
+    if k.returncode != 0:
+        raise ArcaCredencialesError(f"ARCA_KEY ilegible para openssl: {k.stderr.strip()[:300]}")
+    info = dict(l.split("=", 1) for l in r.stdout.strip().splitlines() if "=" in l)
+    return {"subject": info.get("subject", "").strip(), "vence": info.get("notAfter", "").strip()}
 
 
 # ── TRA ────────────────────────────────────────────────────────────────────────
@@ -94,7 +164,7 @@ def _sign_tra(tra_bytes: bytes, cert_path: str, key_path: str) -> str:
     ], capture_output=True)
 
     if result.returncode != 0:
-        raise RuntimeError(
+        raise ArcaCredencialesError(
             f"openssl cms falló:\n{result.stderr.decode('utf-8', errors='replace')}"
         )
 
@@ -123,7 +193,7 @@ def _call_wsaa(cms_b64: str, prod: bool = False) -> dict:
     resp    = requests.post(url, data=soap_body.encode("utf-8"), headers=headers, timeout=30)
 
     if not resp.ok:
-        raise RuntimeError(f"WSAA error {resp.status_code}:\n{resp.text}")
+        raise ArcaCredencialesError(f"WSAA error {resp.status_code}:\n{resp.text}")
 
     root = etree.fromstring(resp.content)
     body = root.find(".//{http://wsaa.view.sua.dvadac.desein.afip.gov.ar}loginCmsReturn")

@@ -16,7 +16,8 @@ jobs:
     env:
       ARCA_CERT: ${{ secrets.ARCA_CERT }}
       ARCA_KEY:  ${{ secrets.ARCA_KEY }}
-      ARCA_PROD: ${{ secrets.ARCA_PROD }}
+      ARCA_PROD: ${{ secrets.ARCA_PROD }}   # "1" = producción (el certificado MonitorXAI es de producción)
+      ARCA_CUIT: ${{ secrets.ARCA_CUIT }}   # CUIT titular del certificado (cuitRepresentada)
 
     steps:
       - name: Checkout

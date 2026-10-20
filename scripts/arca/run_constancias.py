@@ -28,6 +28,7 @@ Columnas clave en la salida:
 """
 
 import os
+import re
 import sys
 import time
 import logging
@@ -38,6 +39,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scripts.arca.padron_a13 import PadronA13
+from scripts.arca.wsaa import ArcaCredencialesError, verificar_credenciales
 
 logging.basicConfig(level=logging.INFO, format="[ARCA] %(message)s")
 log = logging.getLogger(__name__)
@@ -62,6 +64,19 @@ PAUSA = 0.3  # segundos entre consultas
 
 REFRESH_DIAS       = 15  # re-consultar CUITs OK después de N días
 MAX_INTENTOS_ERROR = 3   # reintentar CUITs con error hasta N veces, luego excluir
+MAX_ERRORES_SEGUIDOS = int(os.getenv("ARCA_MAX_ERRORES_SEGUIDOS", "25"))  # corta la corrida
+
+# Errores de configuración / infraestructura (certificado, WSAA, red): no son
+# culpa del CUIT y no deben consumir sus reintentos. Hasta oct-2026 el secret
+# ARCA_CERT era ilegible y las 8.000 consultas diarias fallaban con
+# "Unable to load signer certificate", lo que iba excluyendo a todo el padrón.
+_RE_ERROR_INFRA = re.compile(
+    r"openssl|signer certificate|WSAA|PEM|ARCA_CERT|ARCA_KEY|Connection|Timeout|timed out|"
+    r"Max retries|NameResolution|A13 error 5\d\d", re.IGNORECASE)
+
+
+def _es_error_infra(msg) -> bool:
+    return bool(msg) and not (isinstance(msg, float) and pd.isna(msg)) and bool(_RE_ERROR_INFRA.search(str(msg)))
 
 
 def _norm_cuit(v) -> str:
@@ -179,6 +194,10 @@ def clasificar(padron: list[tuple[str, str]], cache: pd.DataFrame) -> dict:
         error = fila.get("arca_error")
         tiene_error = pd.notna(error) and str(error).strip() != ""
 
+        if tiene_error and _es_error_infra(error):
+            resultado["nuevos"].append((original, norm))
+            continue
+
         if tiene_error:
             intentos = int(fila.get("arca_intentos_error", 0))
             if intentos < MAX_INTENTOS_ERROR:
@@ -203,14 +222,21 @@ def clasificar(padron: list[tuple[str, str]], cache: pd.DataFrame) -> dict:
     return resultado
 
 
-def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.DataFrame) -> pd.DataFrame:
+def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
+    """Devuelve (resultados, abortada). Si hay MAX_ERRORES_SEGUIDOS errores
+    seguidos la corrida se corta y esa racha de errores se descarta (no se
+    guarda ni consume reintentos): casi siempre es una caída de ARCA o un
+    problema de credenciales, no de los CUIT."""
     resultados = []
     errores = 0
+    seguidos = 0
+    abortada = False
 
     for i, (original, norm) in enumerate(a_consultar, 1):
         try:
             data = cliente.get_persona(int(norm))
             row  = procesar_resultado(data, original)
+            seguidos = 0
             log.info(f"[{i}/{len(a_consultar)}] {original} → {row['arca_nombre']} {row['arca_apellido']} ({row['arca_estado_cuit']})")
         except Exception as e:
             log.warning(f"[{i}/{len(a_consultar)}] {original} → ERROR: {e}")
@@ -219,6 +245,7 @@ def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.
                 prev = cache[cache["_cuit_norm"] == norm]
                 if not prev.empty:
                     intentos_previos = int(prev.iloc[0].get("arca_intentos_error", 0))
+            infra = isinstance(e, ArcaCredencialesError) or _es_error_infra(e)
             row = {
                 "cuit":                  original,
                 "arca_nombre":           None,
@@ -231,25 +258,38 @@ def consultar(cliente: PadronA13, a_consultar: list[tuple[str, str]], cache: pd.
                 "arca_domicilio_fiscal": None,
                 "arca_provincia":        None,
                 "arca_error":            str(e),
-                "arca_intentos_error":   intentos_previos + 1,
+                "arca_intentos_error":   intentos_previos + (0 if infra else 1),
                 "arca_fecha_consulta":   datetime.now().strftime("%Y-%m-%d"),
             }
             errores += 1
+            seguidos += 1
 
         resultados.append(row)
+        if seguidos >= MAX_ERRORES_SEGUIDOS:
+            log.error(f"{seguidos} errores seguidos: se corta la corrida y se descarta esa racha.")
+            resultados = resultados[:-seguidos]
+            abortada = True
+            break
         time.sleep(PAUSA)
 
-    log.info(f"Errores en esta corrida: {errores}")
-    return pd.DataFrame(resultados)
+    log.info(f"Errores en esta corrida: {errores}  |  Guardados: {len(resultados)}")
+    return pd.DataFrame(resultados), abortada
 
 
 def guardar_publico(df: pd.DataFrame) -> None:
     if df is None or df.empty:
         return
-    pub = df.reindex(columns=COLS_PUBLICAS)
+    # Sólo filas con respuesta real de ARCA: una fila con error tiene todos los
+    # campos vacíos y la API la devolvía como "encontrada" con nulos.
+    ok = df["arca_estado_cuit"].notna() if "arca_estado_cuit" in df.columns else pd.Series(False, index=df.index)
+    if "arca_error" in df.columns:
+        ok &= df["arca_error"].isna() | (df["arca_error"].astype(str).str.strip() == "")
+    pub = df[ok].reindex(columns=COLS_PUBLICAS)
     pub["cuit"] = pub["cuit"].map(_norm_cuit)
+    pub = pub.sort_values("cuit", kind="mergesort")
     pub.to_csv(PUBLICO_CSV, index=False)
-    log.info(f"Publicable: {PUBLICO_CSV.name} ({len(pub)} filas, sin domicilio ni fecha de nacimiento)")
+    log.info(f"Publicable: {PUBLICO_CSV.name} ({len(pub)} filas con datos de ARCA de {len(df)}, "
+             f"sin domicilio ni fecha de nacimiento)")
 
 
 def main():
@@ -278,11 +318,28 @@ def main():
         return
 
     prod    = os.getenv("ARCA_PROD", "0") == "1"
-    cliente = PadronA13(prod=prod)
     log.info(f"Entorno: {'PRODUCCIÓN' if prod else 'HOMOLOGACIÓN'}")
+    if not prod:
+        log.warning("ARCA_PROD no es \"1\": se consulta HOMOLOGACIÓN. Un certificado de producción "
+                    "no autentica ahí. Definir el secret ARCA_PROD=1.")
+
+    # Verificación previa: si el certificado o la clave no sirven, no tiene
+    # sentido hacer 8.000 consultas que fallan igual (y antes se guardaban como
+    # error de cada CUIT y se publicaba un archivo vacío).
+    try:
+        info = verificar_credenciales()
+        log.info(f"Certificado OK — {info['subject']} — vence {info['vence']}")
+        cliente = PadronA13(prod=prod)
+        cliente._get_auth()
+        log.info("WSAA OK — ticket obtenido")
+    except Exception as e:
+        log.error(f"Credenciales ARCA inválidas, no se consulta nada ni se toca la caché: {e}")
+        sys.exit(2)
+
     log.info(f"A consultar esta corrida: {len(a_consultar)}")
 
-    df_nuevos = consultar(cliente, a_consultar, cache)
+    df_nuevos, abortada = consultar(cliente, a_consultar, cache)
+    a_consultar = a_consultar[:len(df_nuevos)] if abortada else a_consultar
 
     # Combinar con cache: descartar filas que se acaban de actualizar,
     # mantener el resto (incluye cache_vigente y excluidos_error tal cual)
@@ -295,6 +352,9 @@ def main():
 
     df_out.to_csv(OUT_CSV, index=False)
     guardar_publico(df_out)
+    if abortada:
+        log.error("Corrida cortada por errores seguidos (se guardó lo consultado antes del corte).")
+        sys.exit(3)
 
     log.info(f"\n{'='*50}")
     log.info(f"Total en {OUT_CSV.name}: {len(df_out)}")
