@@ -126,7 +126,11 @@ def _build_tra(service: str) -> bytes:
     now      = datetime.datetime.now(datetime.timezone.utc)
     gen_time = (now - datetime.timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     exp_time = (now + datetime.timedelta(minutes=TTL_MINUTES)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    unique_id = abs(hash(f"{service}{now.timestamp()}")) % (10**10)
+    # El XSD del TRA define uniqueId como xsd:unsignedInt (máx. 4294967295).
+    # Antes era hash() % 10**10: hasta 10 dígitos y aleatorio por proceso
+    # (PYTHONHASHSEED), así que ~57% de las corridas daban un valor fuera de
+    # rango y WSAA respondía xml.bad. Los segundos Unix entran hasta 2106.
+    unique_id = int(now.timestamp()) & 0xFFFFFFFF
 
     tra_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
