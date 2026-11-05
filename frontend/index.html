@@ -1710,6 +1710,13 @@ function abrirFicha(poder, key) {
   const cuil = r.cuit || r.cuil || key;
   const cuilLimpio = String(cuil).split('-').join('').replace('.0', '').trim();
 
+  // Reemplaza el "⏳ Cargando…" de un contenedor por un mensaje final, para
+  // que nunca quede colgado cuando no hay datos suficientes o la API falla.
+  const mensajeFinal = (id, texto) => {
+    const div = document.getElementById(id);
+    if (div) div.innerHTML = `<div style="color:#5a6480;font-size:.72rem;font-family:var(--mono)">${texto}</div>`;
+  };
+
   Promise.all([
     fetchJSON(`/api/historico/${cuilLimpio}`, true),
     fetchJSON(`/api/indicadores/funcionario/${cuilLimpio}`, true)
@@ -1719,6 +1726,7 @@ function abrirFicha(poder, key) {
     const evol = histData?.evolucion || {};
     const años = Object.keys(evol).sort();
     const TC_AÑO = { '2022': 184.64, '2023': 847.11, '2024': 1060.28 };
+    let graficoDibujado = false;
 
     if (años.length >= 2) {
       const pts = años.map(a => {
@@ -1730,6 +1738,7 @@ function abrirFicha(poder, key) {
         // Insertar canvas si no existe ya
         const chartDiv = document.getElementById('hist-chart-container');
         if (chartDiv) {
+          graficoDibujado = true;
           chartDiv.innerHTML = `
             <div class="card-title" style="margin-bottom:10px">
               📈 Evolución patrimonial declarada (USD · TC minorista BCRA fin de año)
@@ -1793,8 +1802,19 @@ function abrirFicha(poder, key) {
       }
     }
 
+    if (!graficoDibujado) {
+      mensajeFinal('hist-chart-container', !histData
+        ? 'ℹ️ No se encontró historial de DDJJ para este CUIL en 2022–2024.'
+        : años.length < 2
+          ? `ℹ️ Sólo hay una DDJJ anual cargada (${años[0] || '—'}): la evolución histórica necesita al menos dos años.`
+          : 'ℹ️ Las DDJJ de otros años no informan patrimonio neto: no se puede graficar la evolución.');
+    }
+
     // ── Indicadores internacionales reales ───────────────────────────────
     const indDiv = document.getElementById('ind-container');
+    if (indDiv && !indData) {
+      mensajeFinal('ind-container', 'ℹ️ No hay indicadores internacionales calculados para este CUIL.');
+    }
     if (indDiv && indData) {
       const bd  = indData.breakdown_por_marco || {};
       const row = indData.perfil || {};
@@ -1838,7 +1858,11 @@ function abrirFicha(poder, key) {
         </div>`;
     }
 
-  }).catch(() => {}); // Silencioso si falla
+  }).catch(e => {
+    console.info('[modal] histórico/indicadores:', e?.message || e);
+    mensajeFinal('hist-chart-container', '⚠️ No se pudo cargar la evolución histórica.');
+    mensajeFinal('ind-container', '⚠️ No se pudieron cargar los indicadores internacionales.');
+  });
 }
 
 function closeModal(e) {
