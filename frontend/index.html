@@ -337,6 +337,8 @@
     .poder-tabs { padding: 0 14px; }
     .disclaimer { padding: 6px 14px; }
   }
+  .manual-lang{background:#0f1620;border:1px solid #1e2535;color:#8090b0;border-radius:4px;padding:2px 10px;font-size:.7rem;font-family:var(--mono);cursor:pointer}
+  .manual-lang.activo{background:#0f1e40;border-color:#3b6fff;color:#c8d0e0}
 </style>
 </head>
 <body>
@@ -510,8 +512,9 @@
   <!-- ═══ PANEL MANUAL ═══ -->
   <div class="poder-panel" id="panel-manual">
     <div class="card" style="max-width:920px;margin:0 auto">
-      <div class="card-title">📖 Manual completo — Monitor DDJJ</div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="manual-titulo">📖 Manual completo — Monitor DDJJ</span><span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="manual-lang activo" data-lang="es" onclick="setManualLang('es')">ES</button><button type="button" class="manual-lang" data-lang="en" onclick="setManualLang('en')">EN</button></span></div>
 
+      <div id="manual-es" lang="es">
       <p style="font-size:.8rem;color:#8090b0;line-height:1.75;margin-bottom:22px">
         Monitor DDJJ analiza las Declaraciones Juradas Patrimoniales (DDJJ) de funcionarios públicos argentinos
         de los tres poderes del Estado, cruzando datos abiertos de la Oficina Anticorrupción con 12 indicadores
@@ -752,6 +755,249 @@
         Los scores son indicadores algorítmicos de riesgo — no implican juicio legal ni determinación de responsabilidad.
         Metodología basada en Monteverde (2019) · <em>Journal of Financial Crime</em> · Emerald Publishing.
         Datos amparados por Ley 27.275 de Acceso a la Información Pública.
+      </div>
+      </div>
+      <div id="manual-en" lang="en" style="display:none">
+      <p style="font-size:.8rem;color:#8090b0;line-height:1.75;margin-bottom:22px">
+        Monitor DDJJ analyzes the asset declarations (DDJJ, <em>Declaraciones Juradas Patrimoniales</em>) of Argentine
+        public officials in the three branches of government, crossing open data from the Anti-Corruption Office with 12
+        integrity indicators from international bodies (FATF, World Bank, Transparency International and OECD).
+        This page describes <strong style="color:#c8d0e0">every feature</strong> available and how each analysis
+        is calculated.
+      </p>
+
+      <!-- 1. NAVIGATION -->
+      <div style="font-size:.75rem;font-weight:700;color:#7aaeff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#0f1e40;border:1px solid #1a3060;padding:2px 8px;border-radius:4px">1</span>
+        Panel navigation
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:22px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">🏛️ Executive</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Officials of the National Executive Branch: ministers, secretaries, undersecretaries and political appointees.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📋 Legislative</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">National deputies and senators, with scores by bloc and chamber.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⚖️ Judicial</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">List of judges and magistrates. No asset score — see limitations below.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📖 Manual</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">This page: user guide and full methodology.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">🔬 Indicators</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Detail of the 12 international indicators (FATF/WB/TI/OECD).</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">👤 Author</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">The author's contact details and ways to make a voluntary donation.</div>
+        </div>
+      </div>
+
+      <!-- 2. BRANCH TABS: KPIs / charts / table -->
+      <div style="font-size:.75rem;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#0f2e1f;border:1px solid #1a4a30;padding:2px 8px;border-radius:4px">2</span>
+        Executive / Legislative — KPIs, charts and ranking
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📊 KPI cards</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Total officials loaded, number at each risk level and average score of the filtered set.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📈 Charts</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">
+            <strong style="color:#c8d0e0">Executive:</strong> distribution by risk level · average net worth (USD) by year · average risk score by agency (Top 6).<br>
+            <strong style="color:#c8d0e0">Legislative:</strong> average score by chamber (Deputies/Senators) · net worth distribution (USD).
+          </div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">🔍 Filters</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Search by name/agency/bloc, risk level (CRÍTICO/ALTO/MEDIO/BAJO = critical/high/medium/low), year (Executive) or chamber (Legislative). The ranking shows up to 200 records, sorted by descending score.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📋 Table columns</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Official · agency/bloc · position · final assets (ARS) · equivalent (USD) · change vs. previous year · score · level · "Ver →" (View) button to the individual profile.</div>
+        </div>
+      </div>
+
+      <div style="font-size:.75rem;font-weight:700;color:#ffd060;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#2e2200;border:1px solid #4a3800;padding:2px 8px;border-radius:4px">3</span>
+        Judicial — why it shows no score
+      </div>
+      <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px;margin-bottom:22px">
+        <div style="font-size:.72rem;color:#8090b0;line-height:1.7">
+          The asset declarations of the Judiciary <strong style="color:#c8d0e0">are not publicly accessible</strong>
+          (Law 27,275, art. 16 · Council of the Magistracy). That is why this tab only shows the list
+          of judges and magistrates (name, jurisdiction, position) with a direct link to look up each one's declaration at the
+          official body — a score is never estimated, and a score of 0 is never invented, to avoid misleading results.
+        </div>
+      </div>
+
+      <!-- 3. INDIVIDUAL PROFILE -->
+      <div style="font-size:.75rem;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#241a3a;border:1px solid #3a2a5a;padding:2px 8px;border-radius:4px">4</span>
+        Individual profile ("Ver →" button)
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">💰 Declared assets</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Total assets at the end and at the start of the period (ARS), their USD equivalent at the BCRA retail exchange rate (average selling rate) on the last business day of December of the declared year, and the percentage change between the two.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📊 Income and IVPI</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Declared net income in USD, IVPI with its color flag, net increase in assets and the official's total risk score.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">📈 Historical evolution</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Line chart of declared net worth in USD for 2022, 2023 and 2024, showing the official's full asset trajectory.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">🔬 International indicators</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Individual score in each of the 4 frameworks (FATF · World Bank · TI · OECD) plus the flags (🔴🟡🟢) of the key sub-indicators: PEP, cash ratio, salary gap, speed, conflict of interest and revolving door.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px;grid-column:1/-1">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⚠️ Automatic alerts</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">When the total score is ≥45, the profile highlights the active critical flags in red: red IVPI (unjustified increase in assets), opacity (cash &gt;50% of net worth) or flight (assets abroad &gt;20%).</div>
+        </div>
+      </div>
+
+      <!-- 4. SCORING METHODOLOGY -->
+      <div style="font-size:.75rem;font-weight:700;color:#ff6b35;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#3a1f0f;border:1px solid #5a3a1f;padding:2px 8px;border-radius:4px">5</span>
+        Scoring methodology (Phase 3)
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:14px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#ff6b35;margin-bottom:10px">⚠️ Score and risk level</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            The <strong style="color:#c8d0e0">risk score</strong> (0–100) adds up three dimensions:
+            IVPI (RED 45 pts · YELLOW 20), opacity (30 pts) and flight (25 pts).
+            Cash and assets abroad are taken from the Anti-Corruption Office's asset detail (year-end entries);
+            they are only evaluated for net worth of at least USD 10,000.
+            <br><br>
+            <span style="color:#e63946">■ CRITICAL</span> ≥70 &nbsp;
+            <span style="color:#ff6b35">■ HIGH</span> ≥45 &nbsp;
+            <span style="color:#ffd060">■ MEDIUM</span> ≥20 &nbsp;
+            <span style="color:#2ec27e">■ LOW</span> &lt;20
+          </p>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#ffd060;margin-bottom:10px">📊 IVPI — Asset Variation Index</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            IVPI = increase in net worth (assets − debts) <em>not explained</em> / income declared for the year.
+            Revaluation of already-declared assets and inheritances are deducted, and it is computed in pesos
+            (the dollar is only used to display amounts). An IVPI of <strong style="color:#c8d0e0">2×</strong> means
+            that net worth grew, with no declared explanation, twice as much as the person declared earning.
+            <br>It is only evaluated on <strong style="color:#c8d0e0">annual</strong> declarations (initial and exit declarations are not comparable),
+            with income of at least USD 2,500/year and an unexplained increase of at least USD 10,000. One person = one declaration per year
+            (the annual one and its latest amendment are used).
+            <br><br>
+            <span style="color:#e63946">RED</span> &gt;3× &nbsp;
+            <span style="color:#ffd060">YELLOW</span> &gt;1.5× &nbsp;
+            <span style="color:#2ec27e">GREEN</span> ≤1.5×<br>
+            <span style="color:#5a6480;font-size:.7rem">It does not imply wrongdoing — it is a statistical signal to prioritize review.</span>
+          </p>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#60a5fa;margin-bottom:10px">🕶️ Opacity</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            Measures what share of net worth is held in cash. Red flag when cash exceeds
+            <strong style="color:#c8d0e0">50%</strong> of the declared total — it may indicate difficulty in tracing the origin of the funds.
+          </p>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#e63946;margin-bottom:10px">🌍 Flight</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            Measures the share of assets declared abroad. Red flag when they exceed
+            <strong style="color:#c8d0e0">20%</strong> of total net worth.
+            <br><span style="color:#5a6480;font-size:.7rem">Holding declared assets abroad is legal: the flag only prioritizes review.</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- 5. INTERNATIONAL INDICATORS (summary) -->
+      <div style="font-size:.75rem;font-weight:700;color:#e63946;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#3a0f0f;border:1px solid #5a1f1f;padding:2px 8px;border-radius:4px">6</span>
+        12 international indicators (summary)
+      </div>
+      <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:16px 18px;margin-bottom:22px">
+        <table style="width:100%;font-size:.72rem;color:#8090b0;border-collapse:collapse">
+          <thead>
+            <tr style="color:#c8d0e0;text-align:left">
+              <th style="padding:4px 6px">Framework</th><th style="padding:4px 6px">ID</th><th style="padding:4px 6px">Indicator</th><th style="padding:4px 6px">Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A1</td><td style="padding:4px 6px">PEP Screening (R.12)</td><td style="padding:4px 6px">8%</td></tr>
+            <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A2</td><td style="padding:4px 6px">Beneficial Ownership (R.24/25)</td><td style="padding:4px 6px">7%</td></tr>
+            <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A3</td><td style="padding:4px 6px">Cash ratio &gt;30%</td><td style="padding:4px 6px">8%</td></tr>
+            <tr><td style="padding:4px 6px;color:#e63946">FATF</td><td style="padding:4px 6px">A4</td><td style="padding:4px 6px">High-risk jurisdiction</td><td style="padding:4px 6px">7%</td></tr>
+            <tr><td style="padding:4px 6px;color:#3b6fff">World Bank</td><td style="padding:4px 6px">B1</td><td style="padding:4px 6px">Percentile vs. peers in the same position</td><td style="padding:4px 6px">10%</td></tr>
+            <tr><td style="padding:4px 6px;color:#3b6fff">World Bank</td><td style="padding:4px 6px">B2</td><td style="padding:4px 6px">Salary/net worth gap</td><td style="padding:4px 6px">10%</td></tr>
+            <tr><td style="padding:4px 6px;color:#ffd060">TI</td><td style="padding:4px 6px">C1</td><td style="padding:4px 6px">Speed of accumulation</td><td style="padding:4px 6px">10%</td></tr>
+            <tr><td style="padding:4px 6px;color:#ffd060">TI</td><td style="padding:4px 6px">C2</td><td style="padding:4px 6px">TI risk sector</td><td style="padding:4px 6px">5%</td></tr>
+            <tr><td style="padding:4px 6px;color:#00d4aa">OECD</td><td style="padding:4px 6px">D1</td><td style="padding:4px 6px">Completeness of the declaration</td><td style="padding:4px 6px">5%</td></tr>
+            <tr><td style="padding:4px 6px;color:#00d4aa">OECD</td><td style="padding:4px 6px">D2</td><td style="padding:4px 6px">Conflict of interest</td><td style="padding:4px 6px">13%</td></tr>
+            <tr><td style="padding:4px 6px;color:#00d4aa">OECD</td><td style="padding:4px 6px">D3</td><td style="padding:4px 6px">Revolving door</td><td style="padding:4px 6px">10%</td></tr>
+            <tr><td style="padding:4px 6px;color:#00d4aa">OECD</td><td style="padding:4px 6px">D4</td><td style="padding:4px 6px">Cumulative asset evolution</td><td style="padding:4px 6px">7%</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px;font-size:.7rem;color:#5a6480">
+          See the full detail of thresholds and sources in the 🔬 <strong style="color:#7aaeff">Indicadores</strong> (Indicators) tab.
+        </div>
+      </div>
+
+      <!-- 6. SEARCH / CONVERSION -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#7aaeff;margin-bottom:10px">🔍 Search and filter</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            The search bar finds officials by name or agency/bloc in real time,
+            and can be combined with the risk level and year/chamber filters.
+          </p>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:18px">
+          <div style="font-size:.8rem;font-weight:700;color:#00d4aa;margin-bottom:10px">💰 ARS ↔ USD conversion</div>
+          <p style="font-size:.78rem;color:#8090b0;line-height:1.7">
+            Amounts are converted at the BCRA retail exchange rate (average selling rate) on the last business day of December of the declared year:
+            <strong style="color:#c8d0e0">2022: $184.64 · 2023: $847.11 · 2024: $1,060.28</strong> (BCRA statistics API, variable 4).
+          </p>
+        </div>
+      </div>
+
+      <!-- 7. SOURCES AND UPDATES -->
+      <div style="font-size:.75rem;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="background:#0f1e40;border:1px solid #1a3060;padding:2px 8px;border-radius:4px">7</span>
+        Data sources, updates and limitations
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">🗂️ Data origin</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">Open Data Portal of the Anti-Corruption Office (datos.jus.gob.ar) and datos.gob.ar. Available years: 2022, 2023 and 2024. 2025 data is only published in September/October 2026.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⏱️ Automatic updates</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">A 5-phase pipeline (ETL → cross-checks → scoring → ML → international indicators) runs every day at 06:00 UTC via GitHub Actions and uploads the processed data.</div>
+        </div>
+        <div style="background:#0f1620;border:1px solid #1e2535;border-radius:6px;padding:12px 14px;grid-column:1/-1">
+          <div style="font-size:.75rem;font-weight:600;color:#c8d0e0;margin-bottom:4px">⚠️ Known limitations</div>
+          <div style="font-size:.72rem;color:#8090b0;line-height:1.6">
+            Public procurement: no data for the analysis period. Judiciary: asset declarations are not public (list of names only). The declaration does not report the tax ID (CUIT) of the official's companies, so it cannot be crossed with contract awards (there are no red conflict-of-interest alerts). Cash (A3), companies (A2) and the country of the assets (A4) come from the asset detail; revolving doors (D3), from the declarations of prior and subsequent activities (MAPPAP).
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#090d14;border:1px solid #1a2535;border-radius:6px;padding:14px 18px;font-size:.72rem;color:#4a5a70;line-height:1.7">
+        ⚠️ <strong style="color:#5a7a90">Academic tool.</strong>
+        The scores are algorithmic risk indicators — they imply no legal judgment or finding of responsibility.
+        Methodology based on Monteverde (2019) · <em>Journal of Financial Crime</em> · Emerald Publishing.
+        Data protected by Law 27,275 on Access to Public Information.
+      </div>
       </div>
     </div>
   </div>
@@ -1984,7 +2230,17 @@ function updateTS() {
     });
   });
 })();
+// Idioma del manual (ES/EN); se recuerda en el navegador si se puede
+function setManualLang(lang) {
+  document.getElementById('manual-es').style.display = lang === 'en' ? 'none' : '';
+  document.getElementById('manual-en').style.display = lang === 'en' ? '' : 'none';
+  document.getElementById('manual-titulo').textContent = lang === 'en' ? '📖 Full manual — Monitor DDJJ' : '📖 Manual completo — Monitor DDJJ';
+  document.querySelectorAll('.manual-lang').forEach(b => b.classList.toggle('activo', b.dataset.lang === lang));
+  try { localStorage.setItem('manualLang', lang); } catch (e) {}
+}
+try { if (localStorage.getItem('manualLang') === 'en' || new URLSearchParams(location.search).get('lang') === 'en') setManualLang('en'); } catch (e) {}
 </script>
-<script src="inocencia_overlay.js"></script>
+<script src="inocencia_overlay.js">
+</script>
 </body>
 </html>
