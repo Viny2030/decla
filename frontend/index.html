@@ -1155,17 +1155,25 @@ async function fetchUSD() {
 }
 
 // ── Fetch silencioso (no loguea 404 esperados) ────────────────────────────
-async function fetchJSON(url, silencioso = false) {
+// timeoutMs > 0: si la API no responde a tiempo se corta la consulta y se
+// lanza un error (no null), para que quien llama muestre "no se pudo cargar"
+// en lugar de "no hay datos" o un "Cargando…" que no termina nunca.
+async function fetchJSON(url, silencioso = false, timeoutMs = 0) {
+  const ctrl = timeoutMs > 0 ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
     if (!r.ok) {
       if (!silencioso) console.info(`[API] ${url} → HTTP ${r.status}`);
       return null;
     }
     return await r.json();
   } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`${url}: sin respuesta en ${timeoutMs / 1000} s`);
     if (!silencioso) console.info(`[API] ${url} → ${e.message}`);
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -1718,8 +1726,8 @@ function abrirFicha(poder, key) {
   };
 
   Promise.all([
-    fetchJSON(`/api/historico/${cuilLimpio}`, true),
-    fetchJSON(`/api/indicadores/funcionario/${cuilLimpio}`, true)
+    fetchJSON(`/api/historico/${cuilLimpio}`, true, 20000),
+    fetchJSON(`/api/indicadores/funcionario/${cuilLimpio}`, true, 20000)
   ]).then(([histData, indData]) => {
 
     // ── Gráfico evolución histórica ──────────────────────────────────────
