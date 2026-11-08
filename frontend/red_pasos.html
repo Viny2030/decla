@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red de pasos público-privado · DECLA</title>
+<style>
+:root {
+  --bg: #0b0e14;
+  --card: #161b27;
+  --border: #2a3347;
+  --text: #dfe5f0;
+  --muted: #93a0b8;
+  --accent: #6d94ff;
+  --sector: #e0a458;
+  --linea: #5f7fd6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; }
+header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+header h1 { font-size: 18px; font-weight: 600; flex: 1 1 260px; }
+header a { color: var(--accent); font-size: 13px; }
+body.embed header { display: none; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px 24px 32px; }
+body.embed main { padding: 10px; }
+.aviso { border-left: 3px solid var(--sector); background: var(--card); padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+.barra { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.barra button { font: inherit; font-size: 13px; padding: 5px 11px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.barra button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0b0e14; font-weight: 600; }
+.explica { color: var(--muted); font-size: 13px; min-height: 20px; margin-bottom: 12px; }
+#red { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 16% minmax(0, 1.25fr); }
+#lineas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.col h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+.nodo { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; width: 100%; font: inherit; font-size: 12.5px; line-height: 1.25; text-align: left; color: var(--text); background: var(--card); border: 1px solid var(--border); padding: 5px 8px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; position: relative; }
+.col-sector .nodo { border-left: 3px solid var(--sector); }
+.col-org .nodo { border-right: 3px solid var(--accent); }
+.nodo b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.nodo:hover, .nodo:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nodo[aria-pressed="true"] { background: #24304a; border-color: var(--accent); }
+.nodo.apagado { opacity: .32; }
+#detalle { margin: 14px 0; min-height: 22px; }
+#detalle h3 { font-size: 14px; margin-bottom: 4px; }
+#detalle ul { list-style: none; columns: 2; column-gap: 24px; font-size: 13px; }
+#detalle li { break-inside: avoid; padding: 1px 0; color: var(--muted); }
+#detalle li b { color: var(--text); font-weight: 600; }
+.pista { color: var(--muted); font-size: 13px; }
+.nota { color: var(--muted); font-size: 12.5px; margin: 10px 0 14px; max-width: 880px; }
+.tabla { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: var(--card); font-size: 13px; }
+caption { text-align: left; font-weight: 600; padding-bottom: 6px; }
+th, td { padding: 5px 9px; border-bottom: 1px solid var(--border); text-align: left; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.estado { padding: 30px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  #red { grid-template-columns: minmax(0, 1fr) 10% minmax(0, 1fr); }
+  .nodo { font-size: 11.5px; padding: 4px 5px; }
+  #detalle ul { columns: 1; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="titulo"></h1>
+  <a id="enlace-idioma" href="#"></a>
+  <a id="enlace-tablero" href="/"></a>
+</header>
+<main>
+  <p class="aviso" id="aviso"></p>
+  <div class="barra" id="sentidos" role="group"></div>
+  <p class="explica" id="explica"></p>
+  <div id="red"></div>
+  <div id="detalle" aria-live="polite"></div>
+  <p class="nota" id="nota"></p>
+  <div class="tabla">
+    <table>
+      <caption id="titulo-tabla"></caption>
+      <thead><tr><th id="th-org"></th><th class="num" id="th-e"></th><th class="num" id="th-s"></th><th class="num" id="th-a"></th><th class="num" id="th-t"></th></tr></thead>
+      <tbody id="filas"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+"use strict";
+var params = new URLSearchParams(location.search);
+var EN = params.get("lang") === "en";
+if (params.get("embed") === "1") document.body.classList.add("embed");
+document.documentElement.lang = EN ? "en" : "es";
+var MAX_ORGANISMOS = 24;
+
+var T = EN ? {
+  doc: "Public-private moves network · DECLA", titulo: "Public-private moves network",
+  tablero: "Back to dashboard", idioma: "Español",
+  aviso: "Declaring private activity is not an infraction and does not prove a conflict of interest. This network shows patterns by agency and sector: it does not name people or employers.",
+  sentidos: { todos: "All", entrada: "Entry", simultaneo: "Simultaneous", salida: "Exit" },
+  explica: {
+    todos: "Every move declared in the three directions.",
+    entrada: "Left a private job or activity less than 365 days before taking office.",
+    simultaneo: "Declares continuing private work or activity while in office.",
+    salida: "Moved to the private sector less than 365 days after leaving office."
+  },
+  grupo: "Direction", sector: "Declared private sector", org: "Agency",
+  otros: function (n) { return "Other agencies (" + n + ")"; },
+  pista: "Click a sector or an agency to see its links.",
+  conecta: function (n) { return n + " declarations"; },
+  nota: function (d) { return "Each line counts declarations, not people: " + d.declaraciones + " declarations by " + d.personas + " people, since one person may declare several activities. Source: activity declarations filed with the Anti-Corruption Office (MAPPAP). Public-sector and education or research employers are left out, because public and private cannot be told apart there. Agency names and the original sector categories come from the source, in Spanish; sector labels are translated here."; },
+  tabla: "Every agency", thOrg: "Agency", total: "Total",
+  error: "The network could not be loaded. Try again in a few minutes.", vacio: "There are no declarations for this direction."
+} : {
+  doc: "Red de pasos público-privado · DECLA", titulo: "Red de pasos público-privado",
+  tablero: "Volver al tablero", idioma: "English",
+  aviso: "Declarar una actividad privada no es una infracción ni prueba un conflicto de interés. Esta red muestra patrones por organismo y sector: no nombra personas ni empleadores.",
+  sentidos: { todos: "Todos", entrada: "Entrada", simultaneo: "Simultáneo", salida: "Salida" },
+  explica: {
+    todos: "Todos los pasos declarados, en los tres sentidos.",
+    entrada: "Dejó un empleo o actividad privada menos de 365 días antes de asumir.",
+    simultaneo: "Declara que continúa su empleo o actividad privada mientras ejerce el cargo.",
+    salida: "Pasó al sector privado menos de 365 días después de dejar el cargo."
+  },
+  grupo: "Sentido", sector: "Sector privado declarado", org: "Organismo",
+  otros: function (n) { return "Otros organismos (" + n + ")"; },
+  pista: "Hacé clic en un sector o un organismo para ver sus vínculos.",
+  conecta: function (n) { return n + " declaraciones"; },
+  nota: function (d) { return "Cada línea cuenta declaraciones, no personas: " + d.declaraciones + " declaraciones de " + d.personas + " personas, porque una misma persona puede declarar varias actividades. Fuente: declaraciones de actividades presentadas ante la Oficina Anticorrupción (MAPPAP). Quedan afuera los empleadores del sector público y de educación o investigación, donde no se puede distinguir lo público de lo privado."; },
+  tabla: "Todos los organismos", thOrg: "Organismo", total: "Total",
+  error: "No se pudo cargar la red. Probá de nuevo en unos minutos.", vacio: "No hay declaraciones en este sentido."
+};
+
+var SECTORES_EN = {
+  "Servicios profesionales, técnicos y de apoyo": "Professional, technical and support services",
+  "Otro sector no clasificado en las opciones anteriores": "Other sector not classified above",
+  "Agropecuario, forestal y pesquero": "Agriculture, forestry and fishing",
+  "Salud humana y animal": "Human and animal health",
+  "Banco, finanzas y seguros": "Banking, finance and insurance",
+  "Inmobiliario, construcción, agua potable y desagües": "Real estate, construction, water and sewerage",
+  "Telecomunicaciones, información y prensa": "Telecommunications, information and press",
+  "Minero, petrolero y energético": "Mining, oil and energy",
+  "Electrónico, informático y óptico": "Electronics, computing and optics",
+  "Alimentación, bebidas y cigarrillos": "Food, beverages and tobacco",
+  "Arte, entretenimiento, deporte y recreación": "Arts, entertainment, sport and recreation",
+  "Transporte, almacenamiento, logística y correo": "Transport, storage, logistics and post",
+  "Textil, calzado y marroquinería": "Textiles, footwear and leather goods",
+  "Siderúrgico, automotriz, metalmecánico y electromecánico": "Steel, automotive, metalworking and electromechanical",
+  "Farmacéutico y bioquímico": "Pharmaceutical and biochemical",
+  "Químico y petroquímico": "Chemical and petrochemical",
+  "Turismo, hotelería y gastronomía": "Tourism, hotels and food service"
+};
+function nombreSector(s) { return EN && SECTORES_EN[s] ? SECTORES_EN[s] : s; }
+
+var el = function (id) { return document.getElementById(id); };
+document.title = T.doc;
+el("titulo").textContent = T.titulo;
+el("enlace-tablero").textContent = T.tablero;
+el("enlace-idioma").textContent = T.idioma;
+el("aviso").textContent = T.aviso;
+el("sentidos").setAttribute("aria-label", T.grupo);
+el("titulo-tabla").textContent = T.tabla;
+el("th-org").textContent = T.thOrg;
+el("th-e").textContent = T.sentidos.entrada;
+el("th-s").textContent = T.sentidos.simultaneo;
+el("th-a").textContent = T.sentidos.salida;
+el("th-t").textContent = T.total;
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (EN) q.delete("lang"); else q.set("lang", "en");
+  var s = q.toString();
+  el("enlace-idioma").href = location.pathname + (s ? "?" + s : "");
+})();
+
+var estado = { datos: null, sentido: "todos", sel: null };
+var OTROS = "__otros_organismos__";
+
+function valor(e) { return estado.sentido === "todos" ? e.entrada + e.simultaneo + e.salida : e[estado.sentido]; }
+
+// Agrupa según el sentido elegido: los organismos con más declaraciones van por nombre,
+// y el resto se suma en un nodo; la tabla de abajo lista todos.
+function armar() {
+  var porOrg = {}, porSector = {};
+  estado.datos.enlaces.forEach(function (e) {
+    var n = valor(e);
+    if (!n) return;
+    porOrg[e.organismo] = (porOrg[e.organismo] || 0) + n;
+    porSector[e.sector] = (porSector[e.sector] || 0) + n;
+  });
+  var orgs = Object.keys(porOrg).sort(function (a, b) { return porOrg[b] - porOrg[a] || a.localeCompare(b); });
+  var visibles = orgs.slice(0, MAX_ORGANISMOS), resto = {};
+  orgs.slice(MAX_ORGANISMOS).forEach(function (o) { resto[o] = true; });
+  var enlaces = {};
+  estado.datos.enlaces.forEach(function (e) {
+    var n = valor(e);
+    if (!n) return;
+    var o = resto[e.organismo] ? OTROS : e.organismo, k = e.sector + "\u0001" + o;
+    enlaces[k] = (enlaces[k] || 0) + n;
+  });
+  var nodosOrg = visibles.map(function (o) { return { id: o, nombre: o, n: porOrg[o] }; });
+  var cantResto = orgs.length - visibles.length;
+  if (cantResto > 0) {
+    var suma = orgs.slice(MAX_ORGANISMOS).reduce(function (s, o) { return s + porOrg[o]; }, 0);
+    nodosOrg.push({ id: OTROS, nombre: T.otros(cantResto), n: suma });
+  }
+  var nodosSector = Object.keys(porSector).sort(function (a, b) { return porSector[b] - porSector[a] || a.localeCompare(b); })
+    .map(function (s) { return { id: s, nombre: nombreSector(s), n: porSector[s] }; });
+  var lista = Object.keys(enlaces).map(function (k) {
+    var p = k.split("\u0001");
+    return { sector: p[0], org: p[1], n: enlaces[k] };
+  });
+  return { sectores: nodosSector, orgs: nodosOrg, enlaces: lista };
+}
+
+function crearNodo(nodo, tipo) {
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "nodo";
+  b.dataset.id = nodo.id;
+  b.dataset.tipo = tipo;
+  var s = document.createElement("span");
+  s.textContent = nodo.nombre;
+  var c = document.createElement("b");
+  c.textContent = nodo.n;
+  b.appendChild(s);
+  b.appendChild(c);
+  b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", function () {
+    estado.sel = estado.sel && estado.sel.id === nodo.id && estado.sel.tipo === tipo ? null : { id: nodo.id, tipo: tipo };
+    aplicarSeleccion();
+  });
+  return b;
+}
+function crearColumna(titulo, nodos, tipo, clase) {
+  var col = document.createElement("div");
+  col.className = "col " + clase;
+  var h = document.createElement("h2");
+  h.textContent = titulo;
+  col.appendChild(h);
+  nodos.forEach(function (n) { col.appendChild(crearNodo(n, tipo)); });
+  return col;
+}
+
+var vista = null;
+function dibujarRed() {
+  vista = armar();
+  var red = el("red");
+  red.textContent = "";
+  if (!vista.enlaces.length) {
+    var d = document.createElement("div");
+    d.className = "estado"; d.textContent = T.vacio;
+    red.appendChild(d);
+    el("detalle").textContent = "";
+    return;
+  }
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.id = "lineas";
+  svg.setAttribute("aria-hidden", "true");
+  red.appendChild(svg);
+  red.appendChild(crearColumna(T.sector, vista.sectores, "sector", "col-sector"));
+  red.appendChild(document.createElement("div"));
+  red.appendChild(crearColumna(T.org, vista.orgs, "org", "col-org"));
+  dibujarLineas();
+  aplicarSeleccion();
+}
+
+function dibujarLineas() {
+  var red = el("red"), svg = el("lineas");
+  if (!svg || !vista) return;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var base = red.getBoundingClientRect();
+  var pos = {};
+  red.querySelectorAll(".nodo").forEach(function (b) {
+    var r = b.getBoundingClientRect();
+    pos[b.dataset.tipo + "\u0001" + b.dataset.id] = { y: r.top + r.height / 2 - base.top, izq: r.left - base.left, der: r.right - base.left };
+  });
+  var max = vista.enlaces.reduce(function (m, e) { return Math.max(m, e.n); }, 1);
+  vista.enlaces.forEach(function (e) {
+    var a = pos["sector\u0001" + e.sector], b = pos["org\u0001" + e.org];
+    if (!a || !b) return;
+    var m = (a.der + b.izq) / 2;
+    var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", "M" + a.der + "," + a.y + " C" + m + "," + a.y + " " + m + "," + b.y + " " + b.izq + "," + b.y);
+    p.setAttribute("fill", "none");
+    p.setAttribute("stroke", "#5f7fd6");
+    p.setAttribute("stroke-width", (0.8 + 4 * Math.sqrt(e.n / max)).toFixed(2));
+    p.dataset.sector = e.sector;
+    p.dataset.org = e.org;
+    svg.appendChild(p);
+  });
+  pintarLineas();
+}
+
+function pintarLineas() {
+  var sel = estado.sel;
+  el("lineas").querySelectorAll("path").forEach(function (p) {
+    var on = !sel || (sel.tipo === "sector" ? p.dataset.sector === sel.id : p.dataset.org === sel.id);
+    p.setAttribute("stroke-opacity", sel ? (on ? "0.95" : "0.05") : "0.35");
+  });
+}
+
+function aplicarSeleccion() {
+  var sel = estado.sel;
+  if (sel && !el("red").querySelector('.nodo[data-tipo="' + sel.tipo + '"][data-id="' + CSS.escape(sel.id) + '"]')) {
+    sel = estado.sel = null;
+  }
+  var vinculados = {};
+  if (sel) vista.enlaces.forEach(function (e) {
+    if (sel.tipo === "sector" && e.sector === sel.id) vinculados["org\u0001" + e.org] = true;
+    if (sel.tipo === "org" && e.org === sel.id) vinculados["sector\u0001" + e.sector] = true;
+  });
+  el("red").querySelectorAll(".nodo").forEach(function (b) {
+    var propio = sel && b.dataset.tipo === sel.tipo && b.dataset.id === sel.id;
+    b.setAttribute("aria-pressed", propio ? "true" : "false");
+    b.classList.toggle("apagado", !!sel && !propio && !vinculados[b.dataset.tipo + "\u0001" + b.dataset.id]);
+  });
+  if (el("lineas")) pintarLineas();
+  dibujarDetalle();
+}
+
+function dibujarDetalle() {
+  var d = el("detalle"), sel = estado.sel;
+  d.textContent = "";
+  if (!sel) {
+    var p = document.createElement("p");
+    p.className = "pista"; p.textContent = T.pista;
+    d.appendChild(p);
+    return;
+  }
+  var propio = (sel.tipo === "sector" ? vista.sectores : vista.orgs).filter(function (n) { return n.id === sel.id; })[0];
+  var h = document.createElement("h3");
+  h.textContent = propio.nombre + " · " + T.conecta(propio.n);
+  d.appendChild(h);
+  var ul = document.createElement("ul");
+  vista.enlaces.filter(function (e) { return sel.tipo === "sector" ? e.sector === sel.id : e.org === sel.id; })
+    .sort(function (a, b) { return b.n - a.n; })
+    .forEach(function (e) {
+      var li = document.createElement("li"), b = document.createElement("b");
+      b.textContent = e.n + " ";
+      li.appendChild(b);
+      var otro = sel.tipo === "sector"
+        ? (e.org === OTROS ? vista.orgs[vista.orgs.length - 1].nombre : e.org)
+        : nombreSector(e.sector);
+      li.appendChild(document.createTextNode(otro));
+      ul.appendChild(li);
+    });
+  d.appendChild(ul);
+}
+
+function dibujarTabla() {
+  var t = {};
+  estado.datos.enlaces.forEach(function (e) {
+    var f = t[e.organismo] || (t[e.organismo] = { entrada: 0, simultaneo: 0, salida: 0 });
+    f.entrada += e.entrada; f.simultaneo += e.simultaneo; f.salida += e.salida;
+  });
+  var cuerpo = el("filas");
+  cuerpo.textContent = "";
+  Object.keys(t).map(function (o) { return { o: o, f: t[o], s: t[o].entrada + t[o].simultaneo + t[o].salida }; })
+    .sort(function (a, b) { return b.s - a.s || a.o.localeCompare(b.o); })
+    .forEach(function (x) {
+      var tr = document.createElement("tr");
+      [x.o, x.f.entrada, x.f.simultaneo, x.f.salida, x.s].forEach(function (v, i) {
+        var td = document.createElement("td");
+        if (i) td.className = "num";
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      cuerpo.appendChild(tr);
+    });
+}
+
+function dibujarSentidos() {
+  var cont = el("sentidos");
+  cont.textContent = "";
+  ["todos", "entrada", "simultaneo", "salida"].forEach(function (s) {
+    var b = document.createElement("button");
+    var ps = estado.datos.por_sentido;
+    var n = s === "todos" ? estado.datos.declaraciones : ps[s];
+    b.type = "button";
+    b.textContent = T.sentidos[s] + " (" + n + ")";
+    b.setAttribute("aria-pressed", s === estado.sentido ? "true" : "false");
+    b.addEventListener("click", function () {
+      estado.sentido = s;
+      dibujarSentidos();
+      dibujarRed();
+    });
+    cont.appendChild(b);
+  });
+  el("explica").textContent = T.explica[estado.sentido];
+}
+
+function mensajeError() {
+  var red = el("red");
+  red.textContent = "";
+  var d = document.createElement("div");
+  d.className = "estado"; d.textContent = T.error;
+  red.appendChild(d);
+}
+
+fetch("/api/red-pasos")
+  .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(function (d) {
+    estado.datos = d;
+    el("nota").textContent = T.nota(d);
+    dibujarSentidos();
+    dibujarTabla();
+    dibujarRed();
+  })
+  .catch(mensajeError);
+
+var espera = null;
+window.addEventListener("resize", function () {
+  clearTimeout(espera);
+  espera = setTimeout(dibujarLineas, 120);
+});
+</script>
+</body>
+</html>

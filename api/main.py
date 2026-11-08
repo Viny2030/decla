@@ -15,6 +15,8 @@ from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
+from api.red_pasos import armar_red
+
 BASE_DIR  = Path(__file__).resolve().parent.parent
 PROC_DIR  = BASE_DIR / "data" / "processed"
 FRONT_DIR = BASE_DIR / "frontend"
@@ -128,6 +130,11 @@ def dashboard():
     if p.exists():
         return p.read_text(encoding="utf-8")
     return "<h1>Monitor DDJJ</h1><p>Corré el pipeline para generar los datos.</p>"
+
+
+@app.get("/red", include_in_schema=False)
+def pagina_red():
+    return FileResponse(FRONT_DIR / "red_pasos.html", media_type="text/html")
 
 
 @app.get("/inocencia_overlay.js")
@@ -505,6 +512,14 @@ def judicial(
         ]
     provincias = sorted(df["provincia"].dropna().unique().tolist()) if "provincia" in df.columns else []
     return {"total": len(df), "provincias": provincias, "datos": _rec(df.head(limite))}
+
+
+# ── Red de pasos público-privado ─────────
+
+@app.get("/api/red-pasos")
+def red_pasos():
+    """Declaraciones por organismo y sector privado, sin personas ni empleadores."""
+    return armar_red(_csv("alertas_puertas_giratorias.csv"))
 
 
 # ── Grafo / ML ────────────────────────────────────────────────────────────

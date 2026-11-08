@@ -2,7 +2,7 @@
 scripts/fase2_cruces.py
 ━━━━━━━━━━━━━━━━━━━━━━━
 Fase 2 — Motor de Cruce Relacional
-  Cruce 1: CUIT sociedad DDJJ × adjudicaciones Comprar.gob.ar  → alerta ROJA
+  Cruce 1: CUIT sociedad DDJJ × adjudicaciones del Boletín Oficial  → alerta ROJA
   Cruce 1a: CUIT del funcionario × adjudicaciones del Boletín Oficial
             (Monitor Contratos, CONTRATOS_API_URL)                → alerta ROJA
   Cruce 1b: DDJJ "proveedor o contratista del Estado" = SI       → alerta AMARILLA
@@ -135,7 +135,7 @@ def _base_personas(ddjj: pd.DataFrame) -> pd.DataFrame:
 
 def cruce1_conflicto_interes(ddjj: pd.DataFrame, adjudicaciones: pd.DataFrame) -> pd.DataFrame:
     """Dos fuentes:
-    1. ROJA: CUIT de sociedad del funcionario adjudicada en Comprar (la DDJJ
+    1. ROJA: CUIT de sociedad del funcionario adjudicada en el Boletín Oficial (la DDJJ
        publicada no trae CUIT de sociedades, así que hoy no produce filas).
     2. AMARILLA: la DDJJ trae "proveedor_contratista" = SI. El dataset no
        documenta el campo: lo marcan tanto posibles proveedores como miembros de
@@ -154,7 +154,7 @@ def cruce1_conflicto_interes(ddjj: pd.DataFrame, adjudicaciones: pd.DataFrame) -
             if not a.empty:
                 a["tipo_alerta"] = "CONFLICTO_INTERES"
                 a["criticidad"]  = "ROJA"
-                a["descripcion"] = "Funcionario con participación societaria en empresa adjudicada en Comprar.gob.ar."
+                a["descripcion"] = "Funcionario con participación societaria en empresa adjudicada según el Boletín Oficial."
                 partes.append(a)
 
     # 1a. El propio funcionario (persona física) figura como proveedor adjudicado

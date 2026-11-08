@@ -379,6 +379,7 @@
   <div class="poder-tab" onclick="switchPoder('judicial', this)">⚖️ Judicial <span class="cnt" id="cnt-jud">—</span></div>
   <div class="poder-tab" onclick="switchPanel('manual', this)" style="margin-left:auto">📖 Manual</div>
   <div class="poder-tab" onclick="switchPanel('indicadores', this)">🔬 Indicadores</div>
+  <a class="poder-tab" href="/red" style="text-decoration:none;color:inherit">🔀 Red de pasos</a>
   <div class="poder-tab" onclick="switchPanel('autor', this)">👤 Autor</div>
 </nav>
 
@@ -751,6 +752,14 @@
         </div>
       </div>
 
+      <div id="red-pasos" style="margin:0 0 22px;background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:16px 18px;font-size:.78rem;color:#8090b0;line-height:1.7">
+  <h2 style="font-size:.85rem;color:#c8d0e0;margin-bottom:8px">🔀 Red de pasos público-privado</h2>
+  <p>Grafo de información del sitio. Une cada sector privado declarado con el organismo donde se ejerce el cargo; el grosor de la línea indica cuántas declaraciones hay. Se puede filtrar por sentido: entrada, simultáneo o salida. La tabla de abajo lista todos los organismos.</p>
+  <p>Es agregada a propósito: no nombra personas ni empleadores. Declarar una actividad privada no es una infracción ni prueba un conflicto de interés; muestra dónde conviene mirar con más detalle.</p>
+  <iframe src="/red?embed=1" title="Red de pasos público-privado" loading="lazy" style="width:100%;height:760px;border:1px solid #1e2535;border-radius:10px;background:#0b0e14"></iframe>
+  <p style="font-size:.85em"><a href="/red" target="_blank" rel="noopener">Abrir en pantalla completa ↗</a></p>
+</div>
+
       <div id="funcionamiento" style="margin:0 0 22px;background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:16px 18px;font-size:.78rem;color:#8090b0;line-height:1.7">
   <h2 style="font-size:.85rem;color:#c8d0e0;margin-bottom:8px">🧭 Cómo funciona este sitio</h2>
   <p>Grafo de funcionamiento: de qué fuentes toma los datos, qué procesos los transforman, dónde se guardan y qué publica. Cada nodo lleva su nombre; hacé clic en uno para ver de dónde recibe datos y a qué alimenta.</p>
@@ -767,7 +776,7 @@
   <h3 style="font-size:.78rem;color:#c8d0e0;margin:10px 0 4px">Conexiones</h3>
   <ul><li><strong>usa → Contratos</strong>: Cruce de conflicto de interés: CUIT de funcionarios y sus sociedades × adjudicaciones del BORA.</li><li><strong>← lo usa Mapa</strong>: Enlace y estado en vivo del sitio.</li></ul>
   <h3 style="font-size:.78rem;color:#c8d0e0;margin:10px 0 4px">Fuentes oficiales</h3>
-  <ul><li>Oficina Anticorrupción (datos.jus.gob.ar)</li><li>BCRA (tipo de cambio)</li><li>Contratos (adjudicaciones BORA)</li><li>COMPR.AR</li></ul>
+  <ul><li>Oficina Anticorrupción (datos.jus.gob.ar)</li><li>BCRA (tipo de cambio)</li><li>Contratos (adjudicaciones BORA)</li></ul>
   <p style="font-size:.85em">Detalle de todas las conexiones y de cómo se verifican las cifras entre sitios: <a href="https://mapa.ecosistematransparencia.com.ar/manual#conexiones" target="_blank" rel="noopener">mapa.ecosistematransparencia.com.ar/manual#conexiones</a></p>
 </div>
 
@@ -1013,6 +1022,14 @@
         </div>
       </div>
 
+      <div id="red-pasos-en" style="margin:0 0 22px;background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:16px 18px;font-size:.78rem;color:#8090b0;line-height:1.7">
+  <h2 style="font-size:.85rem;color:#c8d0e0;margin-bottom:8px">🔀 Public-private moves network</h2>
+  <p>The site&#39;s information graph. It links each declared private sector with the agency where the office is held; line thickness shows how many declarations there are. It can be filtered by direction: entry, simultaneous or exit. The table below lists every agency.</p>
+  <p>It is aggregated on purpose: it names neither people nor employers. Declaring private activity is not an infraction and does not prove a conflict of interest; it shows where a closer look may be useful.</p>
+  <iframe src="/red?embed=1&amp;lang=en" title="Public-private moves network" loading="lazy" style="width:100%;height:760px;border:1px solid #1e2535;border-radius:10px;background:#0b0e14"></iframe>
+  <p style="font-size:.85em"><a href="/red?lang=en" target="_blank" rel="noopener">Open full screen ↗</a></p>
+</div>
+
       <div id="funcionamiento-en" style="margin:0 0 22px;background:#0f1620;border:1px solid #1e2535;border-radius:8px;padding:16px 18px;font-size:.78rem;color:#8090b0;line-height:1.7">
   <h2 style="font-size:.85rem;color:#c8d0e0;margin-bottom:8px">🧭 How this site works</h2>
   <p>Workflow graph: where the site gets its data, which processes transform it, where it is stored and what it publishes. Every node carries its name; click one to see where it gets data from and what it feeds.</p>
@@ -1029,7 +1046,7 @@
   <h3 style="font-size:.78rem;color:#c8d0e0;margin:10px 0 4px">Connections</h3>
   <ul><li><strong>uses → Contratos</strong>: Conflict-of-interest check: officials' CUITs and their companies × BORA awards.</li><li><strong>← used by Mapa</strong>: Link and live status of the site.</li></ul>
   <h3 style="font-size:.78rem;color:#c8d0e0;margin:10px 0 4px">Official sources</h3>
-  <ul><li>Anti-Corruption Office (datos.jus.gob.ar)</li><li>Central Bank (FX)</li><li>Contracts (BORA awards)</li><li>COMPR.AR</li></ul>
+  <ul><li>Anti-Corruption Office (datos.jus.gob.ar)</li><li>Central Bank (FX)</li><li>Contracts (BORA awards)</li></ul>
   <p style="font-size:.85em">Every connection in detail, and how figures are cross-checked between sites: <a href="https://mapa.ecosistematransparencia.com.ar/en/manual#conexiones" target="_blank" rel="noopener">mapa.ecosistematransparencia.com.ar/en/manual#conexiones</a></p>
 </div>
 
