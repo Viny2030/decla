@@ -165,6 +165,38 @@ def resumen():
 
 # ── Scoring Fase 3 — TODOS los registros ─────────────────────────────────
 
+@app.get("/frescura.js", include_in_schema=False)
+def frescura_js():
+    return FileResponse(FRONT_DIR / "frescura.js", media_type="application/javascript")
+
+
+@app.get("/api/frescura")
+def frescura():
+    """Ficha de frescura (formato común del ecosistema, ver frescura.py): de
+    dónde sale cada dato, qué período cubre, cuándo se cargó y si está atrasado."""
+    import re
+    from frescura import evaluar
+
+    # El ejercicio vigente y su fecha de consolidación están en la URL que descarga el ETL
+    etl = (BASE_DIR / "scripts" / "fase1_etl.py").read_text(encoding="utf-8")
+    m = re.search(r"declaraciones-juradas-(\d{4})-consolidado-al-(\d{4})(\d{2})(\d{2})", etl)
+    ejercicio, consolidado = (m.group(1), f"{m.group(2)}-{m.group(3)}-{m.group(4)}") if m else (None, None)
+    consulta = None
+    p = PROC_DIR / "constancias_arca_publico.csv"
+    if p.exists():
+        fechas = pd.read_csv(p, usecols=["arca_fecha_consulta"], dtype=str)["arca_fecha_consulta"].dropna()
+        consulta = fechas.max() if len(fechas) else None
+    return evaluar("decla", [
+        {"id": "ddjj", "dato": "Declaraciones juradas", "fuente": "Oficina Anticorrupción (datos.jus.gob.ar)",
+         "periodo": f"ejercicio {ejercicio}, consolidado al {consolidado}" if ejercicio else "sin dato",
+         "periodo_fin": consolidado, "ultima_carga": None,
+         "frecuencia": "la fuente publica por ejercicio", "max_dias_periodo": 545},
+        {"id": "constancias", "dato": "Constancias de inscripción", "fuente": "ARCA",
+         "periodo": f"consultadas hasta {consulta}" if consulta else "sin dato",
+         "ultima_carga": consulta, "frecuencia": "diaria", "max_dias_carga": 3},
+    ])
+
+
 @app.get("/api/scoring")
 def scoring(
     limite:    int           = Query(70000, ge=1, le=70000),
